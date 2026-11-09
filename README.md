@@ -73,7 +73,7 @@ Use **Reset demo** in the app, or call `POST /api/demo/reset` with the authentic
 
 ## Scope and limitations
 
-This is a hackathon demo, not production-ready multi-tenant software. The app uses one demo merchant login and one SQLite database. Live NVIDIA inference has been exercised against the synthetic fixture; no real catalog defect or merchant outcome is claimed. A USD 24.00 PayPal Sandbox order was created, but buyer approval remains pending because the test seller’s receiving preference needs to be saved; no capture or paid readback is verified. Port 3002 is a temporary preview, not stable judge hosting, and the public video and Devpost submission are still pending.
+This is a hackathon demo, not production-ready multi-tenant software. The app uses one demo merchant login and one SQLite database. Live NVIDIA inference has been exercised against the synthetic fixture; no real catalog defect or merchant outcome is claimed. A USD 24.00 PayPal Sandbox order was created, but buyer approval remains pending. The Sandbox page currently shows the currency-conversion preference selected, while a fresh readback did not confirm it persisted; no capture or paid readback is verified. Port 3002 is a temporary preview, not stable judge hosting, and the public video and Devpost submission are still pending.
 
 
 ## Synthetic demo walkthrough
@@ -82,6 +82,6 @@ This is a hackathon demo, not production-ready multi-tenant software. The app us
 2. Run the frozen query, “Find the Ecru Fieldwork Cotton Canvas Tote.” The seed deliberately imports that SKU’s color as Stone while its retained team-authored source record says Ecru.
 3. Show the real model’s observed result. It may identify a conflicting variant, propose a cited correction, or abstain; do not script a response or claim a successful selection if it does not happen.
 4. Approve only a correction that the app presents from the validated run and exact source quote. Replay the unchanged query and compare the new version with the original.
-5. Checkout is a separate PayPal Sandbox step. The current test order is awaiting buyer approval after a Sandbox seller receiving-preference change; no capture or paid state has been verified. No checkout or payment is simulated by the seed.
+5. Checkout is a separate PayPal Sandbox step. The current order remains pending approval while the receiving-preference behavior is diagnosed; no capture or paid state has been verified. No checkout or payment is simulated by the seed.
 
 Use **Reset demo** to restore the fictional two-variant catalog and clear prior demo state. Reset does not create a PayPal transaction.
