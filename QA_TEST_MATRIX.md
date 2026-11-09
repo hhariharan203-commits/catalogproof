@@ -184,3 +184,9 @@ This section supersedes the earlier intermediate failure counts above; those ent
 
 - Confirmed current checkout `32a9db15-989d-46d4-99d8-1e0fe63a4197` for SKU `CCS-CANVAS-TOTE-ECRU-01`, quantity 1, USD 24.00 remains `PAYER_ACTION_REQUIRED` / `approval_pending`; `captureStatus` and capture ID are null, and `verifiedPaid:false`.
 - No additional order was created and no seller preference change was confirmed saved. Buyer approval remains blocked by PayPal’s currency-receiving message; do not mark the purchase paid.
+
+
+## Preference-persistence retest — Nov 9, 2026, 21:46 IST
+
+- The receiving preference appeared selected, but reopening `sandbox.paypal.com` redirected to Sandbox sign-in, so persistence was not verified. No order or capture action was taken during this check.
+- The team is checking reauthentication only with the generated Sandbox Business test account. Stop if the page requires Live PayPal credentials or any Live account change.

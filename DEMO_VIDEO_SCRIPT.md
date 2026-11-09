@@ -60,4 +60,4 @@ Narration: “This is one traceable controlled software test: fixed request, cit
 
 ## Current recording gate
 
-The live NVIDIA route and synthetic before/after test pass locally. The real Sandbox order, buyer approval, capture, and PayPal readback, plus stable judge hosting and clean-browser end-to-end recording, remain pending. Do not publish this as a completed transaction demo until those gates pass.
+The live NVIDIA route and synthetic before/after test pass locally. A USD 24.00 Sandbox order exists but remains `PAYER_ACTION_REQUIRED` because the test seller’s receiving preference has not been confirmed saved; buyer approval, capture, and PayPal readback remain pending. Stable judge hosting and clean-browser end-to-end recording are also pending. Do not publish this as a completed transaction demo until those gates pass.
