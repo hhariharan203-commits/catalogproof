@@ -30,11 +30,11 @@ All bodies are JSON. Validate every field server-side. Error envelope `{error:{c
 - `POST /api/auth/logout` → `{authenticated:false}`.
 - `POST /api/demo/reset` → `{reset:true}`; seed only public licensed demo data and clear events.
 - `GET /api/catalog` → `{currentVersion,versions,items}`.
-- `POST /api/catalog/import` body `{sourceName,sourceUrl?,sourceLicense?,isSynthetic,items:[{productId,sku,title,description?,brand?,variantAttributes?,unitAmountMinor,currency,available?,productUrl?,imageUrl?,sourceRecord?}]}` → `{catalogVersion,itemCount}`.
+- `POST /api/catalog/import` body `{sourceName,sourceUrl?,sourceLicense?,isSynthetic,items:[{productId,sku,title,description?,brand?,variantAttributes?,unitAmountMinor,currency,available:boolean,productUrl?,imageUrl?,sourceRecord?}]}` → `{catalogVersion,itemCount}`. Availability must be a real JSON boolean; strings such as `"false"` are rejected.
 - `POST /api/tests` body `{queryText,expectedSku,settings?}`. Freeze catalog version, query, expected SKU, prompt/model/retrieval settings. Expected SKU must exist in snapshot.
 - `GET /api/tests/:id` → `{test,runs,corrections}`.
 - `POST /api/tests/:id/run` body `{phase:"before"|"after"}` → `{run}`. Before uses original snapshot; after requires an approved correction and child catalog version.
-- `POST /api/corrections` body `{queryTestId,beforeRunId,sku,fieldPath,proposedValue,evidence:{sourceType,sourceReference,exactQuote,recordId?},explanation}` → pending correction only. Seller assertions are labeled as seller-provided, not independent proof.
+- `POST /api/corrections` body `{queryTestId,beforeRunId,sku,fieldPath,proposedValue,evidence:{sourceType,sourceReference,exactQuote,recordId?},explanation}` → pending correction only. The submitted SKU, field, value, and citation must exactly match the validated frozen run’s correction draft, and the quote must occur in the cited source record. Seller approval does not turn a contradictory quote into evidence.
 - `POST /api/corrections/:id/decision` body `{decision:"approve"|"reject"}` → `{correction,catalogVersion}`. Approve alone creates child catalog version; reject records the decision without modifying data.
 - `POST /api/checkouts` body `{afterRunId,quantity}` → `{checkoutId,sku,title,variantAttributes,quantity,unitAmountMinor,currency,totalAmountMinor,approvalUrl,paypalOrderId,status}`. Requires after-run selecting expected SKU from the approved version. Backend computes price and freezes the snapshot before PayPal call.
 - `GET /api/checkouts/:id` → `{checkoutId,snapshot,orderStatus,captureStatus,paypalOrderId,paypalCaptureId,verifiedPaid}`. `verifiedPaid` only if PayPal readback/capture says `COMPLETED` and exact item/SKU/quantity/amount/currency match snapshot.
@@ -47,7 +47,7 @@ This is one authenticated demo workspace, not multi-tenant software. All routes 
 
 ## AI contract
 
-`server/diagnostics.js` exports `async function diagnose(input)`. Input is frozen `{queryText,expectedSku,catalogVersion,candidates:[{sku,title,description,brand,variantAttributes,sourceRecord}]}`. Deterministic hard constraints/candidate ranking run first. Model output schema:
+`server/diagnostics.js` exports `async function diagnose(input)`. Input is frozen `{queryText,expectedSku,catalogVersion,candidates:[{sku,title,description,brand,variantAttributes,sourceRecord,available}]}`. Deterministic hard constraints/candidate ranking run first. Available SKUs may be selected for diagnosis; a SKU that violates an explicit shopper constraint must be labeled `conflicting_evidence` and is never eligible for checkout. Unavailable SKUs are never selectable. Model output schema:
 `{selectedSku,outcome,matchedFacts:[{fieldPath,value,recordId}],issues:[{type,fieldPath,actualValue,expectedOrMissingValue,evidence:[{sku,fieldPath,value,recordId}],explanation}],correctionDraft?:{sku,fieldPath,proposedValue,evidence:[{sourceType,sourceReference,exactQuote,recordId}],explanation},uncertaintyReason?}`.
 Reject unknown SKU, unsupported fact, uncited factual claim or correction without evidence. No uncalibrated numeric confidence. Model never writes catalog, price, stock, SKU or payment state. Seller approval alone creates an immutable child version.
 
