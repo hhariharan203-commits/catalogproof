@@ -52,10 +52,10 @@ Status: targeted QA has run against the current shared source tree. Do not treat
 | P1-04 | Catalog duplication | Duplicate identical variants/SKUs within one version and repeated import with same payload. | Duplicate SKU rejected or explicit dedup policy; repeated imports do not silently merge/change records. |
 | P1-05 | Audit rollback | Roll back an approved child version after an additional correction; inspect all linked runs/checkouts. | New runs use the rollback version; historical runs/orders remain tied to original immutable versions and snapshots. |
 | P1-06 | Accessibility/responsive | Keyboard-only navigation and desktop/mobile viewport smoke of import, review, comparison and purchase. | Focus order and labels usable; status conveyed without color alone; no critical control hidden or clipped. |
-| P1-07 | Performance | Load full 2,938-product licensed fixture and run representative searches/reruns. | No timeout/crash; UI remains responsive; record timings. No unsupported speed claims. |
+| P1-07 | Demo-scale responsiveness | Run the documented 2-row team-authored fictional seed through import, query, correction review, replay and checkout initiation on the target demo host. | No crash, blocked control or obvious stall in the short judge-facing flow; record timings only if making a speed claim. Do not infer production-scale capacity from this fixture. |
 | P1-08 | Logging/privacy | Inspect server logs and analytics with synthetic test buyer and catalog data. | No secrets or unnecessary buyer PII; errors are actionable but redacted. |
 | P1-09 | Reset/recovery | Follow documented demo reset, restart server, and recover from interrupted checkout. | Repeatable clean demo; pending payment reconciles before retry; no stale “paid” record. |
-| P1-10 | Evidence quality | Verify the Shopify mock.shop sample source, fiction disclaimer, exact variant options and the intentionally altered seed field. | Clearly identify the sample as synthetic; show the source value and the controlled test change; do not claim real inventory or merchant demand. |
+| P1-10 | Evidence quality | Verify the team-authored synthetic fixture, fiction disclaimer, exact variant options and the intentionally altered seed field. | Clearly identify the fixture as synthetic; show the source value and the controlled test change; do not claim real inventory or merchant demand. |
 
 ## Differentiation gate (not a QA pass by synthetic tests)
 
@@ -70,7 +70,7 @@ Status: targeted QA has run against the current shared source tree. Do not treat
 
 1. The updated contract specifies single-workspace demo auth, signed HttpOnly/Secure/SameSite=Lax sessions, server-derived `approvedBy`, origin/CSRF checks, rate/body limits and a restricted reset. These are specified but unverified; P0-12, P0-22 and P0-27 remain release gates. This is not multi-tenant production auth.
 2. No runnable app existed at the time this matrix was drafted; no tests or end-to-end run have been performed by QA.
-3. The earlier Livostyle conflict is historical research only. The current seed uses Shopify mock.shop fictional sample data and a deliberately altered attribute; it proves controlled demo mechanics only, not real merchant differentiation.
+3. The earlier Livostyle conflict is historical research only. At the time of this superseded build, the seed used Shopify mock.shop fictional sample data and a deliberately altered attribute; that proved controlled demo mechanics only, not real merchant differentiation. The active seed has since been replaced with team-authored synthetic data.
 4. AI/PayPal environment configuration and credentials must be verified by the integration owner without exposing values. Missing AI must fail closed as `AI_UNAVAILABLE`; missing PayPal must fail closed as `PAYPAL_UNAVAILABLE`.
 
 ## Execution record — Nov 9, 2026
@@ -92,22 +92,75 @@ Status: targeted QA has run against the current shared source tree. Do not treat
 - Demo reset remains FAIL: after a valid import and reset, the catalog is empty and the audit query returns one reset event; contract requires public seed restored and event history cleared. Reset-seed contents must be added before verifying the complete expected result.
 
 - Latest requested independent rerun (Nov 9, 2026): full `npm test` reports 39 passed, 0 failed, 1 skipped; the skipped check is live AI inference because credentials are not configured.
-- Reset black-box PASS: authenticated `POST /api/demo/reset` returned 200, restored exactly 12 fictional mock.shop rows, and the demo workspace audit query returned 0 events.
+- Reset black-box PASS at the time: authenticated `POST /api/demo/reset` returned 200, restored exactly 12 fictional mock.shop rows, and the demo workspace audit query returned 0 events. That sample is no longer active.
 - Availability black-box PASS: `available:"false"` returned 400 `INVALID_AVAILABILITY`; the current catalog version and its 12 rows remained unchanged.
 - Correction black-box PASS: a contradictory client correction returned 400 `CORRECTION_NOT_MATCHED_TO_DIAGNOSIS`; the valid AI-drafted correction remained pending until explicit approval and replay selected `SKU-BLACK`.
 - Capture black-box PASS under provider stubs only: a completed capture with wrong amount (USD 0.01 vs USD 52.99) and another with wrong currency (EUR 52.99 vs USD 52.99) each returned 409, `status:"mismatch"`, `verifiedPaid:false`.
 - Provider evidence remains BLOCKED: no live AI inference or real PayPal Sandbox approval/capture/readback has been run. All provider responses in the black-box route tests above are mocks; do not present them as real transactions.
-- Submission packaging spot check: `/workspace/catalogproof` has no `.git` directory, README, or root LICENSE in the checked tree at the time of review. Confirm the actual public repository, open-source license, run instructions, demo URL, and short video before submission.
+- Historical packaging check: the local worktree lacked `.git`, README and LICENSE at the 17:30 IST check. At 17:37 IST, the public GitHub repository was independently confirmed reachable with README and MIT license. Verify that the latest local fixes and QA matrix have been pushed to that repository before submission.
 
 
-## Superseding QA snapshot — Nov 9, 2026 (latest shared build)
+## Superseded QA snapshot — Nov 9, 2026 (before original-seed migration)
 
 This section supersedes the earlier intermediate failure counts above; those entries are retained as historical findings that drove fixes.
 
-- `npm test`: **39 passed, 0 failed, 1 skipped** (40 tests total). The skipped test is live AI inference; `AI_BASE_URL`, `AI_API_KEY`, and `AI_MODEL` are not configured.
-- Independent black-box checks on the latest local server: reset restores 12 clearly labeled fictional Shopify mock.shop rows and leaves the audit empty; `available:"false"` is rejected with HTTP 400 `INVALID_AVAILABILITY` without replacing the current catalog; a client correction that contradicts the frozen diagnosis is rejected with HTTP 400 `CORRECTION_NOT_MATCHED_TO_DIAGNOSIS`.
+- At that snapshot, `npm test` reported **49 passed, 0 failed, 1 skipped** (50 tests total). The skipped test was live AI inference; that run had no provider settings.
+- Independent black-box checks on that earlier local server: reset restored 12 fictional Shopify mock.shop rows and left the audit empty; `available:"false"` was rejected with HTTP 400 `INVALID_AVAILABILITY`; a client correction contradicting the frozen diagnosis was rejected with HTTP 400 `CORRECTION_NOT_MATCHED_TO_DIAGNOSIS`. The 12-row sample is no longer the active seed.
 - Local mocked route flow covers import → AI response fixture → correction submission → seller approval → same frozen query replay → PayPal order fixture → capture/readback. It proves routes/state logic only. Mocked provider responses are not live AI or PayPal evidence.
 - Independent mocked PayPal negative tests: mismatched capture amount and mismatched capture currency both return HTTP 409, `status:"mismatch"`, `verifiedPaid:false`. No test uses live PayPal credentials.
-- The default product dataset is fictional Shopify mock.shop sample content plus one deliberately incorrect color attribute, marked `isSynthetic=true`. Shopify explicitly says its sample catalogs/prices/inventory are fictional and checkout is mocked. This is allowed sample data for engineering tests, not evidence of a real merchant defect or live inventory: https://shopify.dev/docs/storefronts/headless/mock-shop
-- **Still BLOCKED / NOT RUN:** live inference; PayPal Sandbox buyer approval, capture and API readback; genuine purchasable merchant catalog and differentiation baseline; clean-browser hosted-deployment smoke; published GitHub repo; screen-recorded demo/video upload. The PayPal Developer signup is waiting on the owner’s one-time verification code; no Sandbox REST credentials are available to the app.
-- **Current release judgment: NOT READY.** The local security and route tests are green, but the defining live-provider transaction and hosted demo have not been proven. Do not claim a successful live purchase or completed hackathon submission.
+- At this snapshot, the active fixture was Shopify mock.shop-derived. It has since been replaced with original team-authored fictional data because separate redistribution rights for the sample content were unclear.
+- At that snapshot, live inference; PayPal Sandbox buyer approval, capture and API readback; genuine purchasable merchant catalog and differentiation baseline; clean-browser hosted-deployment smoke; and screen-recorded demo/video upload were BLOCKED / NOT RUN. The public GitHub repo existed, but its current code/matrix sync still needed verification. No Sandbox REST credentials were available in that run.
+- Release judgment at that snapshot: NOT READY. Local security and route tests were green, but the defining live-provider transaction and hosted demo had not been proven.
+
+- Pre-seed-migration release-gate rerun (Nov 9, 2026, 20:13 IST): `npm test` — 49 passed, 0 failed, 1 skipped. The skipped test was live AI inference because provider settings were absent at that point.
+- Additional fresh in-memory API probes: unauthenticated catalog read returned 401; wrong-origin login returned 403 `ORIGIN_REJECTED`; reset without CSRF returned 403; path traversal to `/.env` returned 404 with no environment content. Security headers included `script-src 'self'` and `frame-ancestors 'none'`. Catalog fields containing script-like strings were returned as inert JSON; the UI source contains no `innerHTML` or `insertAdjacentHTML` sinks. This is static/API evidence only, not a real-browser XSS test.
+- Current unresolved matrix gates remain BLOCKED/NOT RUN where they require real AI or PayPal, an actual buyer approval, deployed-browser journey, webhook delivery (webhooks are not implemented), or unexecuted failure/race scenarios. Do not infer those from local mocks or passing unit tests.
+
+
+## Release-gate rerun — Nov 9, 2026, 20:27 IST (before seed promotion)
+
+- `npm test`: 52 passed, 0 failed, 2 skipped. The skipped cases are the two opt-in live AI tests because the standard suite runs without provider configuration.
+- `npm run test:live`: 54 passed, 0 failed, 0 skipped. This includes live NVIDIA inference and the team-authored synthetic-fixture correction/replay test; it does not exercise PayPal live or Sandbox APIs.
+- PayPal remains BLOCKED for live proof: no real Sandbox buyer approval, capture, or authoritative PayPal readback occurred in either suite. Route/payment tests use mocks.
+- At that run, the separate `data/team_authored_fixture.json` had 2 unique fictional SKUs, `isSynthetic:true`, a Stone import against a source Ecru option for one SKU, and a consistent Ink variant. It has since been promoted to the active seed as `data/demo_seed.json`.
+- A fresh fetch of the public GitHub page shows 5 commits, README and MIT code license. The published QA matrix is still stale at 39 pass/1 skip; latest local QA results and any seed/documentation updates must be pushed and verified before submission.
+
+
+## Post-seed-switch QA rerun — Nov 9, 2026, 20:34 IST
+
+- The active seed is now `data/demo_seed.json`, containing the original two-variant fictional fixture. Documentation and Reset demo copy now describe the team-authored fixture rather than mock.shop.
+- `npm test`: 51 passed, 1 failed, 2 skipped. The failing auth-route test at `test/server-auth.test.js:108` still expects the old Shopify mock.shop seed name.
+- `npm run test:live`: 52 passed, 2 failed, 0 skipped. The live AI inference smoke passes. The team-fixture replay test fails before inference because it still reads the now-removed `data/team_authored_fixture.json`; the other failure is the same stale seed-name assertion.
+- These results supersede the earlier 54/54 live-suite run from before the seed swap. Do not claim the current integrated build is green until both stale test references are updated and the suites pass again.
+- PayPal remains BLOCKED: no real Sandbox buyer approval, capture, or authoritative readback has run. The demo is not fully release-ready until that gate and deployment/submission checks are completed.
+
+
+## Live route smoke — Nov 9, 2026, 20:36 IST
+
+- A fresh HTTPS preview instance was started from the active two-row synthetic seed; `GET /api/health` reported SQLite, NVIDIA configured, and PayPal Sandbox configured. This is a temporary preview, not stable judge hosting.
+- Authenticated query setup succeeded, but the real NVIDIA before-run returned HTTP 422 `AI_INVALID_RESPONSE`: `matchedFacts[1] is not an exact catalog citation.` The server failed closed; no correction or checkout was attempted.
+- No PayPal order, buyer approval, capture, or readback occurred. Friday is investigating the model’s unsupported citation without relaxing exact-citation validation; rerun this section after that fix.
+
+
+## Latest sequential rerun — Nov 9, 2026, 20:44 IST
+
+- `npm test`: 55 passed, 0 failed, 2 skipped (the opt-in live AI tests).
+- `npm run test:live`: 56 passed, 1 failed, 0 skipped. The direct live inference smoke passed, but the before-correction run on the team-authored fixture returned an output inconsistent with the explicit Ecru query constraint. Server validation correctly rejected it as `AI_INVALID_RESPONSE` (“An SKU that violates an explicit query constraint must be reported as conflicting_evidence”). This is a real-model reliability failure in the target flow; do not weaken the hard-constraint or evidence checks to force a green result.
+- The formerly stale seed-name reset assertion and fixture path now pass in this run; this report supersedes the 20:34 seed-migration test failures.
+- Real PayPal Sandbox buyer approval, capture and authoritative readback remain BLOCKED/NOT RUN. The green local PayPal route checks still use mocks.
+
+
+## Post-fix release-gate snapshot — Nov 9, 2026, 20:54 IST
+
+- Per Hulk’s sequential post-fix run: `npm test` — 57 passed, 0 failed, 2 live-AI skips; `npm run test:live` — 59 passed, 0 failed, including real NVIDIA inference and the team-authored synthetic-fixture correction/replay.
+- Friday reports that the exact shopper query also now passes the authenticated route-level live-inference flow and produces a source-resolved correction draft. This result is reported by the integration team; I have not independently rerun that post-fix route in this entry.
+- This snapshot supersedes the 20:44 live-model failure for the updated tree. Keep the earlier hard-constraint/422 failures as historical regressions; the checks must remain strict.
+- PayPal create-order, buyer approval, capture, and authoritative readback remain NOT RUN pending Doom’s Sandbox test. Route-level PayPal mocks do not satisfy this gate.
+- Port 3002 is a temporary preview, not stable judge-ready hosting. A stable public demo and clean-browser deployment smoke remain NOT RUN.
+- Release judgment remains NOT READY; do not claim submission-ready until PayPal Sandbox proof, stable hosted access, required video, and final submission checks are complete.
+
+
+## Sandbox buyer access status — Nov 9, 2026, 20:58–21:02 IST
+
+- The first approval attempt was stopped before credentials or payment when the browser redirected to the Live PayPal sign-in host. No order or capture IDs exist from that attempt.
+- A later team update reports that the Developer Dashboard Sandbox account list is accessible again and the generated Personal test buyer is being checked. No order creation, buyer approval, capture, or PayPal readback has been reported yet; keep the P0 PayPal gate NOT RUN until completed end to end.

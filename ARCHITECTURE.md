@@ -28,7 +28,7 @@ All bodies are JSON. Validate every field server-side. Error envelope `{error:{c
 - `GET /api/auth/session` → `{authenticated,csrfToken}`.
 - `POST /api/auth/login` body `{password}` → `{authenticated:true,csrfToken}` and session cookie.
 - `POST /api/auth/logout` → `{authenticated:false}`.
-- `POST /api/demo/reset` → `{reset:true}`; seed only public licensed demo data and clear events.
+- `POST /api/demo/reset` → `{reset:true}`; seed the team-authored synthetic fixture and clear events.
 - `GET /api/catalog` → `{currentVersion,versions,items}`.
 - `POST /api/catalog/import` body `{sourceName,sourceUrl?,sourceLicense?,isSynthetic,items:[{productId,sku,title,description?,brand?,variantAttributes?,unitAmountMinor,currency,available:boolean,productUrl?,imageUrl?,sourceRecord?}]}` → `{catalogVersion,itemCount}`. Availability must be a real JSON boolean; strings such as `"false"` are rejected.
 - `POST /api/tests` body `{queryText,expectedSku,settings?}`. Freeze catalog version, query, expected SKU, prompt/model/retrieval settings. Expected SKU must exist in snapshot.
@@ -43,7 +43,7 @@ All bodies are JSON. Validate every field server-side. Error envelope `{error:{c
 
 ## Auth, session and safety
 
-This is one authenticated demo workspace, not multi-tenant software. All routes except health, auth session and login require `cp_session` (`HttpOnly; Secure; SameSite=Lax; Path=/`, 8-hour expiry). `DEMO_PASSWORD` and random `SESSION_SECRET` are env-only; compare passwords in constant time, don’t log request bodies, rate-limit login. Mutations require same-origin `Origin` plus exact session-bound `X-CSRF-Token`; keep token in memory, not URL/local storage. Authenticated identity is fixed `demo-merchant`; ignore/reject any client `approvedBy`. `POST /api/auth/logout` requires CSRF and clears cookie. `POST /api/demo/reset` requires session+CSRF, resets only public licensed seed data. Request bodies are size limited; rate-limit login/checkout. Never persist private merchant data in the public demo; if writable-route auth cannot be implemented/tested, do not deploy publicly.
+This is one authenticated demo workspace, not multi-tenant software. All routes except health, auth session and login require `cp_session` (`HttpOnly; Secure; SameSite=Lax; Path=/`, 8-hour expiry). `DEMO_PASSWORD` and random `SESSION_SECRET` are env-only; compare passwords in constant time, don’t log request bodies, rate-limit login. Mutations require same-origin `Origin` plus exact session-bound `X-CSRF-Token`; keep token in memory, not URL/local storage. Authenticated identity is fixed `demo-merchant`; ignore/reject any client `approvedBy`. `POST /api/auth/logout` requires CSRF and clears cookie. `POST /api/demo/reset` requires session+CSRF and restores the team-authored synthetic fixture. Request bodies are size limited; rate-limit login/checkout. Never persist private merchant data in the public demo; if writable-route auth cannot be implemented/tested, do not deploy publicly.
 
 ## AI contract
 
@@ -57,4 +57,4 @@ Reject unknown SKU, unsupported fact, uncited factual claim or correction withou
 
 ## UI and scope
 
-A focused catalog inspection workspace: frozen shopper query and selected SKU; evidence by exact source field; proposed correction diff; explicit seller approve/reject; identical before/after replay; separate exact-SKU buyer checkout; audit trail labeling AI/seller/PayPal events. Do not show fake stats, claim Store Sync integration, or invent conversion lift. Synthetic fixtures must be prominently labeled. Keep only test-sized extracts of the MIT LIVOStyle dataset and retain its license notice; do not commit the 30MB full catalog unless later needed.
+A focused catalog inspection workspace: frozen shopper query and selected SKU; evidence by exact source field; proposed correction diff; explicit seller approve/reject; identical before/after replay; separate exact-SKU buyer checkout; audit trail labeling AI/seller/PayPal events. Do not show fake stats, claim Store Sync integration, or invent conversion lift. Synthetic fixtures must be prominently labeled. The default fixture is original team-authored synthetic data covered by the repository MIT license; do not replace it with third-party or merchant data without confirming the right to use and redistribute it.

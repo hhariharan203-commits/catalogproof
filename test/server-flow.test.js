@@ -60,6 +60,11 @@ test('actual routes compose import → AI diagnosis → seller approval → repl
     PAYPAL_API_BASE: 'https://api-m.sandbox.paypal.com',
   });
 
+  let createCalls = 0;
+  const createRequestIds = [];
+  const remoteOrdersByRequestId = new Map();
+  let captureCalls = 0;
+  const captureRequestIds = [];
   globalThis.fetch = async (input, init = {}) => {
     const target = typeof input === 'string' ? input : input.url;
     if (target.startsWith(base)) return originalFetch(input, init);
@@ -71,11 +76,19 @@ test('actual routes compose import → AI diagnosis → seller approval → repl
       return response({ access_token: 'fake-access-token', expires_in: 3600, token_type: 'Bearer' });
     }
     if (target === 'https://api-m.sandbox.paypal.com/v2/checkout/orders' && init.method === 'POST') {
+      createCalls += 1;
+      const requestId = init.headers['PayPal-Request-Id'];
+      createRequestIds.push(requestId);
       const payload = JSON.parse(init.body);
-      const id = 'ORDER-SANDBOX-1';
-      const order = { id, status: 'CREATED', purchase_units: payload.purchase_units,
-        links: [{ rel: 'payer-action', href: 'https://www.sandbox.paypal.com/checkoutnow?token=ORDER-SANDBOX-1' }] };
-      orders.set(id, order);
+      let order = remoteOrdersByRequestId.get(requestId);
+      if (!order) {
+        const id = `ORDER-SANDBOX-${remoteOrdersByRequestId.size + 1}`;
+        order = { id, status: 'CREATED', purchase_units: payload.purchase_units,
+          links: [{ rel: 'payer-action', href: `https://www.sandbox.paypal.com/checkoutnow?token=${id}` }] };
+        remoteOrdersByRequestId.set(requestId, order);
+        orders.set(id, order);
+      }
+      if (createCalls === 1) return response({ name: 'INTERNAL_SERVER_ERROR' }, 500);
       return response(order, 201);
     }
     const orderMatch = target.match(/^https:\/\/api-m\.sandbox\.paypal\.com\/v2\/checkout\/orders\/([^/]+)(?:\/capture)?$/);
@@ -84,6 +97,8 @@ test('actual routes compose import → AI diagnosis → seller approval → repl
       const order = orders.get(id);
       if (!order) return response({ name: 'RESOURCE_NOT_FOUND' }, 404);
       if (target.endsWith('/capture') && init.method === 'POST') {
+        captureCalls += 1;
+        captureRequestIds.push(init.headers['PayPal-Request-Id']);
         order.status = 'COMPLETED';
         const amount = order.purchase_units[0].amount;
         order.purchase_units[0].payments = { captures: [{ id: 'CAPTURE-SANDBOX-1', status: 'COMPLETED', amount: { ...amount } }] };
@@ -180,17 +195,35 @@ test('actual routes compose import → AI diagnosis → seller approval → repl
   assert.equal(after.json.run.selectedSku, 'SKU-BLACK');
   assert.equal(after.json.run.outcome, 'supported_match');
 
-  const checkout = await call('/api/checkouts', { method: 'POST', ...auth, body: { afterRunId: after.json.run.id, quantity: 1, price: 1, sku: 'TAMPERED' } });
+  const checkoutBody = { afterRunId: after.json.run.id, quantity: 1, price: 1, sku: 'TAMPERED' };
+  const ambiguousCreate = await call('/api/checkouts', { method: 'POST', ...auth, body: checkoutBody });
+  assert.equal(ambiguousCreate.status, 500);
+  assert.equal(ambiguousCreate.json.error.code, 'PAYPAL_API_ERROR');
+  const checkout = await call('/api/checkouts', { method: 'POST', ...auth, body: checkoutBody });
   assert.equal(checkout.status, 201, JSON.stringify(checkout.json));
   assert.equal(checkout.json.sku, 'SKU-BLACK');
   assert.equal(checkout.json.totalAmountMinor, 5299);
   assert.equal(checkout.json.paypalOrderId, 'ORDER-SANDBOX-1');
   assert.match(checkout.json.approvalUrl, /^https:\/\/www\.sandbox\.paypal\.com\//);
+  assert.equal(createCalls, 2);
+  assert.equal(createRequestIds.length, 2);
+  assert.equal(createRequestIds[1], createRequestIds[0]);
+  assert.equal(remoteOrdersByRequestId.size, 1);
+
+  const duplicateCheckout = await call('/api/checkouts', { method: 'POST', ...auth, body: checkoutBody });
+  assert.equal(duplicateCheckout.status, 201);
+  assert.equal(duplicateCheckout.json.checkoutId, checkout.json.checkoutId);
+  assert.equal(duplicateCheckout.json.paypalOrderId, checkout.json.paypalOrderId);
+  assert.equal(createCalls, 2);
 
   const pending = await call(`/api/checkouts/${checkout.json.checkoutId}`, { ...auth });
   assert.equal(pending.status, 200);
   assert.equal(pending.json.verifiedPaid, false);
   assert.equal(pending.json.status, 'approval_pending');
+  const prematureCapture = await call(`/api/checkouts/${checkout.json.checkoutId}/capture`, { method: 'POST', ...auth, body: {} });
+  assert.equal(prematureCapture.status, 409);
+  assert.equal(prematureCapture.json.error.code, 'PAYPAL_NOT_APPROVED');
+  assert.equal(captureCalls, 0);
 
   orders.get('ORDER-SANDBOX-1').status = 'APPROVED';
   const approved = await call(`/api/checkouts/${checkout.json.checkoutId}`, { ...auth });
@@ -203,8 +236,37 @@ test('actual routes compose import → AI diagnosis → seller approval → repl
   assert.equal(capture.json.orderStatus, 'COMPLETED');
   assert.equal(capture.json.captureStatus, 'COMPLETED');
   assert.equal(capture.json.paypalCaptureId, 'CAPTURE-SANDBOX-1');
+  assert.equal(captureCalls, 1);
+  assert.equal(captureRequestIds.length, 1);
 
-  orders.get('ORDER-SANDBOX-1').purchase_units[0].payments.captures[0].amount.value = '0.01';
+  const captureRetry = await call(`/api/checkouts/${checkout.json.checkoutId}/capture`, { method: 'POST', ...auth, body: {} });
+  assert.equal(captureRetry.status, 200);
+  assert.equal(captureRetry.json.verifiedPaid, true);
+  assert.equal(captureRetry.json.orderStatus, 'COMPLETED');
+  assert.equal(captureRetry.json.paypalCaptureId, 'CAPTURE-SANDBOX-1');
+  assert.equal(captureCalls, 1);
+
+  const completedOrder = orders.get('ORDER-SANDBOX-1');
+  completedOrder.purchase_units[0].items[0].sku = 'SKU-TAMPERED';
+  const mismatchedSkuRetry = await call(`/api/checkouts/${checkout.json.checkoutId}/capture`, { method: 'POST', ...auth, body: {} });
+  assert.equal(mismatchedSkuRetry.status, 409);
+  assert.equal(mismatchedSkuRetry.json.error.code, 'PAYPAL_ORDER_MISMATCH');
+  assert.equal(captureCalls, 1);
+  completedOrder.purchase_units[0].items[0].sku = 'SKU-BLACK';
+
+  completedOrder.purchase_units[0].amount.value = '0.01';
+  const mismatchedAmountRetry = await call(`/api/checkouts/${checkout.json.checkoutId}/capture`, { method: 'POST', ...auth, body: {} });
+  assert.equal(mismatchedAmountRetry.status, 409);
+  assert.equal(mismatchedAmountRetry.json.error.code, 'PAYPAL_ORDER_MISMATCH');
+  assert.equal(captureCalls, 1);
+  completedOrder.purchase_units[0].amount.value = '52.99';
+
+  completedOrder.purchase_units[0].payments.captures[0].amount.value = '0.01';
+  const mismatchedCaptureRetry = await call(`/api/checkouts/${checkout.json.checkoutId}/capture`, { method: 'POST', ...auth, body: {} });
+  assert.equal(mismatchedCaptureRetry.status, 409);
+  assert.equal(mismatchedCaptureRetry.json.verifiedPaid, false);
+  assert.equal(mismatchedCaptureRetry.json.status, 'mismatch');
+  assert.equal(captureCalls, 1);
   const mismatchedCapture = await call(`/api/checkouts/${checkout.json.checkoutId}`, { ...auth });
   assert.equal(mismatchedCapture.status, 200);
   assert.equal(mismatchedCapture.json.verifiedPaid, false);

@@ -4,16 +4,16 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f3f4f0">
-  <meta name="description" content="CatalogProof tests product-variant selection against real catalog evidence.">
+  <meta name="description" content="CatalogProof replays a fixed shopper request against cited catalog fields and checks a PayPal Sandbox order against the exact SKU.">
   <title>CatalogProof — Product selection proof</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="preload" href="/fonts/archivo-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/ibm-plex-mono-400-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <link rel="stylesheet" href="/app.css">
   <script src="/app.js" defer></script>
 </head>
 <body>
-  <a class="skip-link" href="#main">Skip to workflow</a>
+  <a id="skipLink" class="skip-link" href="#main">Skip to workflow</a>
 
   <section id="loginScreen" class="login-screen" hidden aria-labelledby="loginTitle">
     <div class="login-sheet">
@@ -55,12 +55,12 @@
       </div>
     </header>
 
-    <main id="main">
+    <main id="main" tabindex="-1">
       <section id="top" class="opening">
         <div class="opening-copy">
           <p class="eyebrow"><span class="signal-dot"></span> THE VARIANT PROOF BENCH</p>
-          <h1>Does the right<br>question reach the<br><em>right product?</em></h1>
-          <p class="opening-deck">Replay one shopper request against a frozen catalog. See the SKU an AI selects, inspect the evidence, approve a supported fix, then test the same request again.</p>
+          <h1>Test the SKU<br>before the<br><em>buyer pays.</em></h1>
+          <p class="opening-deck">Freeze a shopper’s request. Inspect the AI’s selected SKU and cited source fields, let the seller approve a correction, replay the exact query, then check the order against PayPal Sandbox readback.</p>
           <a class="jump-link" href="#workflow">Start with a catalog <span aria-hidden="true">↓</span></a>
         </div>
         <div class="opening-figure" aria-label="The test sequence: shopper query, catalog evidence, seller decision, and purchase verification">
@@ -69,7 +69,7 @@
           <div class="sequence-row"><span class="sequence-index">02</span><span class="sequence-name">SKU SELECTION</span><span class="sequence-state">OBSERVED</span></div>
           <div class="sequence-row"><span class="sequence-index">03</span><span class="sequence-name">SELLER REVIEW</span><span class="sequence-state">REQUIRED</span></div>
           <div class="sequence-row"><span class="sequence-index">04</span><span class="sequence-name">PAYPAL CAPTURE</span><span class="sequence-state">READ BACK</span></div>
-          <div class="figure-foot"><span>NO SILENT CATALOG CHANGES</span><span>NO FRONTEND PAYMENT CLAIMS</span></div>
+          <div class="figure-foot"><span>SYNTHETIC TEST FIXTURE</span><span>PAYPAL SANDBOX ONLY</span></div>
         </div>
       </section>
 
@@ -84,6 +84,7 @@
           <div id="catalogSummary" class="catalog-summary">
             <span class="summary-empty">No catalog loaded</span>
           </div>
+          <p id="syntheticFixtureNote" class="fixture-note" hidden></p>
 
           <details id="importDetails" class="import-details">
             <summary><span>Import JSON</span><span aria-hidden="true">＋</span></summary>
@@ -135,7 +136,7 @@
             <form id="queryForm" class="query-form">
               <div class="query-field">
                 <label for="queryText">Natural-language request</label>
-                <textarea id="queryText" rows="3" maxlength="1200" required disabled>Oat linen tailored pants, size M, color Ecru</textarea>
+                <textarea id="queryText" rows="3" maxlength="1200" placeholder="Describe the exact product variant the shopper wants" required disabled></textarea>
               </div>
               <div class="query-bottom">
                 <div class="expected-field">

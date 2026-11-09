@@ -23,14 +23,14 @@ A single-merchant, authenticated hackathon demo that tests whether a frozen shop
 - Ink: `#1D2524` (near-black-green)
 - Muted: `#626B68` (secondary labels)
 - Rule: `#D4D9D5` (hairlines)
-- Signal: `#D84E37` (discrepancy and primary action)
+- Signal: `#B93E2A` (discrepancy and primary action; adjusted to meet AA contrast for small labels and button text)
 - Verified: `#17674D` (confirmed evidence/approval)
-- Type: Archivo for display and interface; IBM Plex Mono for true SKU/status values. Google Fonts are declared once in the document head.
+- Type: Archivo for display and interface; IBM Plex Mono for true SKU/status values. Latin WOFF2 subsets are self-hosted in `fonts/`; their SIL Open Font License notices are bundled alongside them.
 - Grid: Desktop source rail plus evidence column, with a responsive single-column workflow on phones. Section rhythm alternates compact input, open comparison, and denser evidence groups.
 - Shape: 3px utility corners; no repeated floating-card treatment or fake dashboard metrics.
 
 ## Integrity rules
-- Start empty unless the server supplies a permitted public/synthetic seed. Do not silently preload LIVOStyle or present its time-sensitive conflict as proven defect or current inventory.
+- Start empty unless the server supplies a clearly labeled synthetic demo fixture. Do not present synthetic data as a real merchant defect, live inventory, sale, or demand proof.
 - Catalog import requires the user to assert rights and disallows private merchant uploads to the public demo. JSON import is size-limited and uses explicit source/license metadata.
 - A catalog snapshot is not a live stock check. Checkout stays disabled unless the current approved snapshot marks the selected variant available.
 - AI errors, missing credentials, ambiguous answers, and uncited suggestions are shown honestly; there is no mocked response.
@@ -39,4 +39,4 @@ A single-merchant, authenticated hackathon demo that tests whether a frozen shop
 - CSRF stays in memory; only non-secret test/checkout IDs are kept in session storage for same-tab recovery.
 
 ## QA notes
-- Current UI-only static checks: JavaScript syntax and HTML parse passed. API integration, browser visual checks, keyboard/a11y, mobile layout, real AI, PayPal Sandbox and deployment remain NOT RUN until the shared server is integrated.
+- UI checks: JavaScript syntax and all DOM IDs pass; clean Chromium captures of the integrated desktop/phone workflow were reviewed with the original team-authored synthetic fixture. At 1440px and 390px, axe found 0 violations; at 1440px, 390px, and 320px there was no horizontal overflow. Keyboard skip-link flow reached password then the app main; both fonts and the favicon loaded with 0 failed requests or console errors. This was local visual QA only: no diagnosis or checkout was triggered. Real PayPal Sandbox approval/capture/readback and hosted-browser proof remain separate release gates.

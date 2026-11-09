@@ -286,7 +286,7 @@ function amountToMinor(value, currency) {
   if (amount > BigInt(Number.MAX_SAFE_INTEGER)) return null;
   return Number(amount);
 }
-function verifyOrder(order, snapshot, requireApproved = false) {
+function verifyOrder(order, snapshot) {
   const unit = Array.isArray(order?.purchase_units) && order.purchase_units.length === 1 ? order.purchase_units[0] : null;
   const item = Array.isArray(unit?.items) && unit.items.length === 1 ? unit.items[0] : null;
   const amount = unit?.amount;
@@ -305,12 +305,19 @@ function verifyOrder(order, snapshot, requireApproved = false) {
     || amountToMinor(amount?.value, snapshot.currency) !== snapshot.totalAmountMinor
     || BigInt(snapshot.quantity) * BigInt(snapshot.unitAmountMinor) !== BigInt(snapshot.totalAmountMinor);
   if (mismatch) throw apiError('PAYPAL_ORDER_MISMATCH', 'PayPal order does not match the frozen catalog selection.', 409);
-  if (requireApproved && order.status !== 'APPROVED') throw apiError('PAYPAL_NOT_APPROVED', 'PayPal has not approved this order.', 409);
   return { unit, item };
 }
 function latestCapture(order) {
   const captures = order?.purchase_units?.[0]?.payments?.captures;
   return Array.isArray(captures) && captures.length ? captures.at(-1) : null;
+}
+function checkoutCreateResponse(row) {
+  const snapshot = parseJson(row.snapshot_json, {});
+  return { checkoutId: row.id, sku: snapshot.sku, title: snapshot.title,
+    variantAttributes: snapshot.variantAttributes, quantity: snapshot.quantity,
+    unitAmountMinor: snapshot.unitAmountMinor, currency: snapshot.currency,
+    totalAmountMinor: snapshot.totalAmountMinor, approvalUrl: row.approval_url,
+    paypalOrderId: row.paypal_order_id, status: row.app_status };
 }
 function checkoutsResponse(row, order) {
   const snapshot = parseJson(row.snapshot_json, {});
@@ -549,39 +556,52 @@ async function api(req, res, url) {
     if (!run) throw apiError('AFTER_RUN_REQUIRED', 'A completed after-run is required before checkout.', 409);
     const test = db.prepare('SELECT * FROM query_tests WHERE id=?').get(run.query_test_id);
     if (!test || run.selected_sku !== test.expected_sku || run.outcome !== 'supported_match') throw apiError('WRONG_VARIANT', 'Only the supported expected SKU can be checked out.', 409);
-    const item = catalogRow(run.catalog_version_id, run.selected_sku);
-    if (!item || !item.available) throw apiError('ITEM_UNAVAILABLE', 'The selected catalog variant is not marked available; checkout is blocked.', 409);
     const quantity = body.quantity ?? 1;
     if (!Number.isSafeInteger(quantity) || quantity < 1 || quantity > 10) throw apiError('INVALID_QUANTITY', 'Quantity must be between 1 and 10.', 400);
-    const total = item.unit_amount_minor * quantity;
-    if (!Number.isSafeInteger(total)) throw apiError('INVALID_TOTAL', 'Order total exceeds supported range.', 400);
-    const id = uid();
-    const requestId = randomBytes(16).toString('hex');
-    const base = checkoutBaseUrl();
-    const snapshot = {
-      checkoutId: id, catalogVersionId: run.catalog_version_id, productId: item.product_id, sku: item.sku,
-      title: item.title, variantAttributes: parseJson(item.variant_attributes_json, {}), quantity,
-      unitAmountMinor: item.unit_amount_minor, currency: item.currency, totalAmountMinor: total,
-      productUrl: item.product_url, imageUrl: item.image_url,
-      returnUrl: `${base}/checkout/return?checkoutId=${encodeURIComponent(id)}`,
-      cancelUrl: `${base}/checkout/cancel?checkoutId=${encodeURIComponent(id)}`,
-    };
-    const timestamp = now();
-    db.prepare(`INSERT INTO checkouts(id,catalog_version_id,after_run_id,sku,quantity,unit_amount_minor,currency,total_amount_minor,snapshot_json,create_request_id,app_status,created_at,updated_at)
-      VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(id, run.catalog_version_id, run.id, item.sku, quantity, item.unit_amount_minor, item.currency, total, json(snapshot), requestId, 'approval_pending', timestamp, timestamp);
-    audit('checkout', id, 'buyer', 'checkout_started', { sku: item.sku, quantity, totalAmountMinor: total, currency: item.currency });
+    let existing, id, requestId, snapshot;
+    db.exec('BEGIN IMMEDIATE');
+    try {
+      existing = db.prepare('SELECT * FROM checkouts WHERE after_run_id=? AND quantity=? ORDER BY created_at DESC, id DESC LIMIT 1').get(run.id, quantity);
+      if (existing) {
+        id = existing.id;
+        requestId = existing.create_request_id;
+        snapshot = parseJson(existing.snapshot_json, {});
+      } else {
+        const item = catalogRow(run.catalog_version_id, run.selected_sku);
+        if (!item || !item.available) throw apiError('ITEM_UNAVAILABLE', 'The selected catalog variant is not marked available; checkout is blocked.', 409);
+        const total = item.unit_amount_minor * quantity;
+        if (!Number.isSafeInteger(total)) throw apiError('INVALID_TOTAL', 'Order total exceeds supported range.', 400);
+        id = uid();
+        requestId = randomBytes(16).toString('hex');
+        const base = checkoutBaseUrl();
+        snapshot = {
+          checkoutId: id, catalogVersionId: run.catalog_version_id, productId: item.product_id, sku: item.sku,
+          title: item.title, variantAttributes: parseJson(item.variant_attributes_json, {}), quantity,
+          unitAmountMinor: item.unit_amount_minor, currency: item.currency, totalAmountMinor: total,
+          productUrl: item.product_url, imageUrl: item.image_url,
+          returnUrl: `${base}/checkout/return?checkoutId=${encodeURIComponent(id)}`,
+          cancelUrl: `${base}/checkout/cancel?checkoutId=${encodeURIComponent(id)}`,
+        };
+        const timestamp = now();
+        db.prepare(`INSERT INTO checkouts(id,catalog_version_id,after_run_id,sku,quantity,unit_amount_minor,currency,total_amount_minor,snapshot_json,create_request_id,app_status,created_at,updated_at)
+          VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(id, run.catalog_version_id, run.id, item.sku, quantity, item.unit_amount_minor, item.currency, total, json(snapshot), requestId, 'approval_pending', timestamp, timestamp);
+        audit('checkout', id, 'buyer', 'checkout_started', { sku: item.sku, quantity, totalAmountMinor: total, currency: item.currency });
+      }
+      db.exec('COMMIT');
+    } catch (error) { db.exec('ROLLBACK'); throw error; }
+    if (existing?.paypal_order_id && existing.approval_url) {
+      return send(res, 201, checkoutCreateResponse(existing));
+    }
     try {
       const order = await paypal.createOrder({ snapshot, requestId });
       const approvalUrl = order.links?.find((link) => link.rel === 'payer-action' || link.rel === 'approve')?.href;
       if (!approvalUrl || !order.id) throw apiError('PAYPAL_INVALID_RESPONSE', 'PayPal did not return an order approval link.', 502);
-      db.prepare('UPDATE checkouts SET paypal_order_id=?,approval_url=?,paypal_order_status=?,updated_at=? WHERE id=?')
+      db.prepare("UPDATE checkouts SET paypal_order_id=?,approval_url=?,paypal_order_status=?,app_status='approval_pending',updated_at=? WHERE id=?")
         .run(order.id, approvalUrl, order.status || 'CREATED', now(), id);
       audit('checkout', id, 'paypal', 'order_created', { orderId: order.id, status: order.status || 'CREATED' });
-      return send(res, 201, { checkoutId: id, sku: item.sku, title: item.title,
-        variantAttributes: snapshot.variantAttributes, quantity, unitAmountMinor: item.unit_amount_minor,
-        currency: item.currency, totalAmountMinor: total, approvalUrl, paypalOrderId: order.id, status: 'approval_pending' });
+      return send(res, 201, checkoutCreateResponse(db.prepare('SELECT * FROM checkouts WHERE id=?').get(id)));
     } catch (error) {
-      db.prepare("UPDATE checkouts SET app_status='failed',updated_at=? WHERE id=?").run(now(), id);
+      db.prepare("UPDATE checkouts SET app_status='failed',updated_at=? WHERE id=? AND paypal_order_id IS NULL").run(now(), id);
       audit('checkout', id, 'paypal', 'order_create_failed', { code: error.code || 'PAYPAL_ERROR' });
       throw error;
     }
@@ -600,11 +620,12 @@ async function api(req, res, url) {
     if (!row || !row.paypal_order_id) throw apiError('NOT_FOUND', 'Checkout order not found.', 404);
     const snapshot = parseJson(row.snapshot_json, {});
     const order = await paypal.getOrder(row.paypal_order_id);
-    verifyOrder(order, snapshot, true);
+    verifyOrder(order, snapshot);
     if (order.status === 'COMPLETED') {
       const completed = checkoutsResponse(row, order);
       return send(res, completed.verifiedPaid ? 200 : 409, completed);
     }
+    if (order.status !== 'APPROVED') throw apiError('PAYPAL_NOT_APPROVED', 'PayPal has not approved this order.', 409);
     const captureRequestId = row.capture_request_id || randomBytes(16).toString('hex');
     db.prepare("UPDATE checkouts SET app_status='capture_pending',capture_request_id=?,updated_at=? WHERE id=?").run(captureRequestId, now(), row.id);
     audit('checkout', row.id, 'system', 'capture_started', { orderId: row.paypal_order_id });

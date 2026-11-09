@@ -1,5 +1,6 @@
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 const ENV_KEYS = [
   'AI_BASE_URL', 'AI_API_KEY', 'AI_MODEL',
@@ -54,6 +55,21 @@ function input(overrides = {}) {
     ],
     ...overrides,
   };
+}
+
+function teamFixtureCandidates() {
+  const seed = JSON.parse(readFileSync(new URL('../data/demo_seed.json', import.meta.url), 'utf8'));
+  return seed.items.map((item, index) => ({
+    sku: item.sku,
+    title: item.title,
+    description: item.description,
+    brand: item.brand,
+    variantAttributes: item.variantAttributes,
+    sourceRecord: item.sourceRecord,
+    productUrl: item.productUrl,
+    available: item.available,
+    recordId: `db-row-${index + 1}`,
+  }));
 }
 
 function response(status, payload) {
@@ -174,10 +190,121 @@ test('model request is server-side, candidate-limited, JSON-constrained and vali
       assert.equal(payload.queryText, input().queryText);
       assert.equal(payload.catalogVersion, 'test-version-1');
       assert.ok(payload.availableSkus.includes('SHOE-RED-38'));
+      assert.deepEqual(payload.constraintSatisfyingSkus, ['SHOE-RED-38']);
       assert.ok(payload.candidates.every((row) => input().candidates.some((item) => item.sku === row.sku)));
       assert.ok(payload.candidates.length <= 12);
+      assert.ok(payload.candidates.every((row) => Array.isArray(row.citationFields)));
+      assert.ok(payload.candidates[0].citationFields.some((field) => field.fieldPath === 'variantAttributes.Color'
+        && field.value === 'Red'));
       assert.equal(JSON.stringify(payload).includes(aiEnv('request-shape').AI_API_KEY), false);
     },
+  });
+});
+
+test('array citations use exact numeric paths, and shorthand citations are rejected', async (t) => {
+  const { diagnose } = await loadDiagnostics();
+  const row = {
+    sku: 'TOTE-ECRU',
+    title: 'Fieldwork Cotton Canvas Tote',
+    description: 'Original synthetic fixture.',
+    brand: 'Cedar Current Studio (fictional)',
+    variantAttributes: { Color: 'Stone' },
+    available: true,
+    recordId: 'record-TOTE-ECRU',
+    productUrl: 'https://shop.example.test/products/tote-ecru',
+    sourceRecord: { variantId: 'source-variant-TOTE-ECRU', selectedOptions: [{ name: 'Color', value: 'Ecru' }] },
+  };
+  const request = input({
+    queryText: 'Find the Fieldwork Cotton Canvas Tote in color Ecru',
+    expectedSku: row.sku,
+    catalogVersion: 'tote-v1',
+    candidates: [row],
+  });
+  const valid = {
+    selectedSku: row.sku,
+    outcome: 'conflicting_evidence',
+    matchedFacts: [
+      { fieldPath: 'variantAttributes.Color', value: 'Stone', recordId: row.recordId },
+      { fieldPath: 'sourceRecord.selectedOptions.0.value', value: 'Ecru', recordId: row.recordId },
+    ],
+    issues: [{
+      type: 'conflicting_source_values',
+      fieldPath: 'variantAttributes.Color',
+      actualValue: 'Stone',
+      expectedOrMissingValue: 'Ecru',
+      evidence: [
+        { sku: row.sku, fieldPath: 'variantAttributes.Color', value: 'Stone', recordId: row.recordId },
+        { sku: row.sku, fieldPath: 'sourceRecord.selectedOptions.0.value', value: 'Ecru', recordId: row.recordId },
+      ],
+      explanation: 'The import and source option disagree.',
+    }],
+    correctionDraft: {
+      sku: row.sku,
+      fieldPath: 'variantAttributes.Color',
+      proposedValue: 'Ecru',
+      evidence: [{
+        sourceType: 'catalog_record',
+        sourceReference: 'catalog://tote-v1/sku/TOTE-ECRU',
+        exactQuote: 'Ecru',
+        recordId: row.recordId,
+      }],
+      explanation: 'The exact source option supports Ecru.',
+    },
+    uncertaintyReason: null,
+  };
+  await t.test('exact indexed source path is accepted', async () => {
+    let payload;
+    await withRuntime({
+      env: aiEnv('indexed-citation'),
+      fetchImpl: async (_url, options) => {
+        payload = JSON.parse(JSON.parse(options.body).messages[1].content);
+        return modelResponse(valid);
+      },
+      run: async () => {
+        const result = await diagnose(request);
+        const candidatePayload = payload.candidates.find((item) => item.sku === row.sku);
+        assert.deepEqual(payload.constraintSatisfyingSkus, []);
+        assert.ok(candidatePayload.citationFields.some((field) => field.fieldPath === 'sourceRecord.selectedOptions.0.value'
+          && field.value === 'Ecru' && field.recordId === row.recordId && field.sku === row.sku));
+        assert.ok(!candidatePayload.citationFields.some((field) => field.fieldPath.includes('[]')));
+        assert.equal(result.outcome, 'conflicting_evidence');
+        assert.equal(result.correctionDraft.proposedValue, 'Ecru');
+      },
+    });
+  });
+  await t.test('invented array shorthand is rejected', async () => {
+    const invalid = structuredClone(valid);
+    invalid.matchedFacts[1].fieldPath = 'sourceRecord.selectedOptions[].Color';
+    await withRuntime({
+      env: aiEnv('bad-array-path'),
+      fetchImpl: async () => modelResponse(invalid),
+      run: async () => {
+        await assert.rejects(diagnose(request), (error) => error.code === 'AI_INVALID_RESPONSE');
+      },
+    });
+  });
+  await t.test('source variant ID cannot replace the CatalogProof row ID', async () => {
+    const invalid = structuredClone(valid);
+    invalid.matchedFacts[1].recordId = 'source-variant-TOTE-ECRU';
+    await withRuntime({
+      env: aiEnv('wrong-source-record-id'),
+      fetchImpl: async () => modelResponse(invalid),
+      run: async () => {
+        await assert.rejects(diagnose(request), (error) => error.code === 'AI_INVALID_RESPONSE');
+      },
+    });
+  });
+  await t.test('correction cannot cite the imported value against the named source option', async () => {
+    const invalid = structuredClone(valid);
+    invalid.correctionDraft.proposedValue = 'Stone';
+    invalid.correctionDraft.evidence[0].exactQuote = 'Stone';
+    await withRuntime({
+      env: aiEnv('contradictory-source-option'),
+      fetchImpl: async () => modelResponse(invalid),
+      run: async () => {
+        await assert.rejects(diagnose(request), (error) => error.code === 'AI_INVALID_RESPONSE');
+      },
+    });
   });
 });
 
@@ -404,6 +531,46 @@ test('an absent-size query may return an available variant only as a cited confl
   });
 });
 
+test('issue expected values may cite the query constraint but not an invented value', async (t) => {
+  const { diagnose } = await loadDiagnostics();
+  const query = input({ queryText: 'Find a red trail runner size 42' });
+  const issueResponse = (expectedOrMissingValue) => ({
+    selectedSku: 'SHOE-RED-39',
+    outcome: 'conflicting_evidence',
+    matchedFacts: [],
+    issues: [{
+      type: 'size_mismatch',
+      fieldPath: 'variantAttributes.Size',
+      actualValue: '39',
+      expectedOrMissingValue,
+      evidence: [{ sku: 'SHOE-RED-39', fieldPath: 'variantAttributes.Size', value: '39', recordId: 'record-SHOE-RED-39' }],
+      explanation: 'The record lists 39, whereas the shopper asks for 42.',
+    }],
+    correctionDraft: null,
+    uncertaintyReason: null,
+  });
+  await t.test('query value is accepted as query-derived, not catalog evidence', async () => {
+    await withRuntime({
+      env: aiEnv('query-expected-value'),
+      fetchImpl: async () => modelResponse(issueResponse('42')),
+      run: async () => {
+        const result = await diagnose(query);
+        assert.equal(result.outcome, 'conflicting_evidence');
+        assert.match(result.issues[0].explanation, /query asks for "42"/);
+      },
+    });
+  });
+  await t.test('unrequested expected value is rejected', async () => {
+    await withRuntime({
+      env: aiEnv('invented-expected-value'),
+      fetchImpl: async () => modelResponse(issueResponse('40')),
+      run: async () => {
+        await assert.rejects(diagnose(query), (error) => error.code === 'AI_INVALID_RESPONSE');
+      },
+    });
+  });
+});
+
 test('a model cannot select an unavailable exact-match SKU', async () => {
   const { diagnose } = await loadDiagnostics();
   const query = input({
@@ -612,4 +779,39 @@ test('live AI inference smoke (not mocked)', { timeout: 110_000, skip: liveInfer
   const result = await diagnose(input());
   assert.ok(['supported_match', 'conflicting_evidence', 'insufficient_evidence', 'ambiguous'].includes(result.outcome));
   assert.ok(result.selectedSku === null || input().candidates.some((row) => row.sku === result.selectedSku));
+});
+
+test('live NVIDIA team-authored fixture correction replay (not mocked)', {
+  timeout: 200_000,
+  skip: liveInferenceConfigured ? false : 'AI_BASE_URL, AI_API_KEY and AI_MODEL are not configured in this environment.',
+}, async () => {
+  const { diagnose } = await loadDiagnostics();
+  const candidates = teamFixtureCandidates();
+  const targetSku = 'CCS-CANVAS-TOTE-ECRU-01';
+  const queryText = 'Find the Ecru Fieldwork Cotton Canvas Tote.';
+  const before = await diagnose({
+    queryText,
+    expectedSku: targetSku,
+    catalogVersion: 'team-synthetic-before-live-smoke',
+    candidates,
+  });
+  assert.notEqual(before.outcome, 'supported_match', 'the controlled Stone/Ecru inconsistency must not pass as a supported match');
+  assert.ok(before.selectedSku === null || before.outcome === 'conflicting_evidence');
+  assert.equal(before.correctionDraft?.sku, targetSku);
+  assert.equal(before.correctionDraft?.fieldPath, 'variantAttributes.Color');
+  assert.equal(before.correctionDraft?.proposedValue, 'Ecru');
+  assert.ok(before.correctionDraft?.evidence.some((item) => item.exactQuote === 'Ecru'
+    && item.recordId === candidates.find((candidate) => candidate.sku === targetSku)?.recordId));
+
+  const corrected = candidates.map((candidate) => candidate.sku === targetSku
+    ? { ...candidate, variantAttributes: { ...candidate.variantAttributes, Color: 'Ecru' } }
+    : candidate);
+  const after = await diagnose({
+    queryText,
+    expectedSku: targetSku,
+    catalogVersion: 'team-synthetic-after-live-smoke',
+    candidates: corrected,
+  });
+  assert.equal(after.selectedSku, targetSku);
+  assert.equal(after.outcome, 'supported_match');
 });

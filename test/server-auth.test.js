@@ -104,8 +104,8 @@ test('auth routes enforce session, origin and CSRF, and logout clears access', a
   assert.equal(seededCatalog.status, 200);
   const seedResult = await seededCatalog.json();
   assert.equal(seedResult.currentVersion.isSynthetic, true);
-  assert.ok(seedResult.items.length > 0);
-  assert.match(seedResult.currentVersion.sourceName, /Shopify mock\.shop sample catalog/);
+  assert.equal(seedResult.items.length, 2);
+  assert.match(seedResult.currentVersion.sourceName, /CatalogProof team-authored fictional two-variant fixture/);
   const resetAudit = await fetch(`${base}/api/audit?entityType=demo&entityId=workspace`, { headers: { cookie } });
   assert.deepEqual((await resetAudit.json()).events, []);
 
