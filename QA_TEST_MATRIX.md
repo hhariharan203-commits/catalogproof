@@ -227,3 +227,10 @@ This section supersedes the earlier intermediate failure counts above; those ent
 - Per the owner’s approval, the matching Sandbox seller’s currency preference was briefly changed to “No, deny the payments,” then restored to “Yes, accept and convert them to USD.” The page displayed “Saved!” after the restore.
 - An authenticated fresh-page readback still showed all three currency options unselected. No other preference changed, and no order was created, retried, approved, or captured. The existing USD 24.00 checkout remains pending and unpaid.
 - Treat the PayPal approval/capture/readback gate as blocked; do not retry further setting toggles unless a supported save path is found or the owner approves a new test plan.
+
+
+## Approved live-demo reset verified — Nov 9, 2026, 22:27 IST
+
+- The owner-approved reset completed through the authenticated API. The public synthetic fixture is restored to 2 rows; `CCS-CANVAS-TOTE-ECRU-01` is imported as Stone while its source option remains Ecru.
+- `GET /api/audit?entityType=demo&entityId=workspace` returned 0 events. Reset also cleared local checkout records, corrections, and runs; it did not contact PayPal or cancel the separate pending USD 24.00 Sandbox order.
+- This restored the baseline for the clean-browser AI/query smoke. No PayPal approval or capture was performed.
