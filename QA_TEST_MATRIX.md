@@ -190,3 +190,9 @@ This section supersedes the earlier intermediate failure counts above; those ent
 
 - The receiving preference appeared selected, but reopening `sandbox.paypal.com` redirected to Sandbox sign-in, so persistence was not verified. No order or capture action was taken during this check.
 - The team is checking reauthentication only with the generated Sandbox Business test account. Stop if the page requires Live PayPal credentials or any Live account change.
+
+
+## Fresh Sandbox preference readback — Nov 9, 2026, 21:47 IST
+
+- After authenticating to the generated Sandbox Business account, a fresh readback showed all three currency-receiving options unselected. The earlier apparent “accept and convert to USD” selection did not persist.
+- No account preference change or order action occurred in this check. Existing order `5E888079UK227011P` remains pending and has no capture. The settings page is being staged again for the owner to save the Sandbox-only choice.
