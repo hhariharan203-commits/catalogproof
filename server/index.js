@@ -98,8 +98,6 @@ function originIsSame(req) {
   if (!origin) return false;
   try {
     const u = new URL(origin);
-    const host = req.headers.host;
-    if (u.host === host) return true;
     return new URL(PUBLIC_BASE_URL).origin === u.origin;
   } catch { return false; }
 }
@@ -311,6 +309,10 @@ function latestCapture(order) {
   const captures = order?.purchase_units?.[0]?.payments?.captures;
   return Array.isArray(captures) && captures.length ? captures.at(-1) : null;
 }
+function captureList(order) {
+  const captures = order?.purchase_units?.[0]?.payments?.captures;
+  return Array.isArray(captures) ? captures : [];
+}
 function checkoutCreateResponse(row) {
   const snapshot = parseJson(row.snapshot_json, {});
   return { checkoutId: row.id, sku: snapshot.sku, title: snapshot.title,
@@ -321,26 +323,28 @@ function checkoutCreateResponse(row) {
 }
 function checkoutsResponse(row, order) {
   const snapshot = parseJson(row.snapshot_json, {});
+  const captures = captureList(order);
   const capture = latestCapture(order);
-  const captureStatus = capture?.status || row.paypal_capture_status || null;
-  const captureMatches = Boolean(capture?.id)
+  const captureStatus = capture ? (capture.status || null) : (row.paypal_capture_status || null);
+  const captureId = capture ? (capture.id || null) : (row.paypal_capture_id || null);
+  const captureMatches = captures.length === 1 && Boolean(capture?.id)
     && capture?.amount?.currency_code === snapshot.currency
     && amountToMinor(capture?.amount?.value, snapshot.currency) === snapshot.totalAmountMinor;
-  const paid = order?.status === 'COMPLETED' && captureStatus === 'COMPLETED' && captureMatches;
+  const paid = order?.status === 'COMPLETED' && capture?.status === 'COMPLETED' && captureMatches;
   let appStatus = row.app_status;
   if (paid) appStatus = 'completed';
   else if (order?.status === 'APPROVED') appStatus = 'approved';
   else if (order?.status === 'VOIDED') appStatus = 'cancelled';
   else if (order?.status === 'PAYER_ACTION_REQUIRED' || order?.status === 'CREATED') appStatus = 'approval_pending';
-  else if (order?.status === 'COMPLETED' && !captureMatches) appStatus = 'mismatch';
+  else if (order?.status === 'COMPLETED') appStatus = 'mismatch';
   if (appStatus !== row.app_status) {
     db.prepare('UPDATE checkouts SET app_status=?, paypal_order_status=?, paypal_capture_status=?, paypal_capture_id=?, updated_at=? WHERE id=?')
-      .run(appStatus, order?.status || row.paypal_order_status, captureStatus, capture?.id || row.paypal_capture_id, now(), row.id);
-    audit('checkout', row.id, 'paypal', 'state_readback', { orderStatus: order?.status, captureStatus, captureId: capture?.id || null });
+      .run(appStatus, order?.status || row.paypal_order_status, captureStatus, captureId, now(), row.id);
+    audit('checkout', row.id, 'paypal', 'state_readback', { orderStatus: order?.status, captureStatus, captureId });
   }
   return { checkoutId: row.id, snapshot, approvalUrl: row.approval_url,
     orderStatus: order?.status || row.paypal_order_status,
-    captureStatus, paypalOrderId: row.paypal_order_id, paypalCaptureId: capture?.id || row.paypal_capture_id,
+    captureStatus, paypalOrderId: row.paypal_order_id, paypalCaptureId: captureId,
     status: appStatus, verifiedPaid: paid };
 }
 async function api(req, res, url) {
@@ -644,8 +648,8 @@ async function api(req, res, url) {
     if (!result.verifiedPaid) {
       const capture = latestCapture(finalOrder);
       const failed = capture?.status === 'DECLINED' || capture?.status === 'FAILED';
-      const mismatch = finalOrder.status === 'COMPLETED' && capture?.status === 'COMPLETED';
-      const status = failed ? 'failed' : mismatch ? 'mismatch' : 'capture_pending';
+      const mismatch = finalOrder.status === 'COMPLETED' && !result.verifiedPaid;
+      const status = mismatch ? 'mismatch' : failed ? 'failed' : 'capture_pending';
       db.prepare('UPDATE checkouts SET app_status=?,paypal_capture_status=?,paypal_capture_id=?,updated_at=? WHERE id=?')
         .run(status, capture?.status || null, capture?.id || null, now(), row.id);
       audit('checkout', row.id, 'paypal', mismatch ? 'capture_mismatch' : failed ? 'capture_failed' : 'capture_not_completed',

@@ -66,7 +66,9 @@ Status: targeted QA has run against the current shared source tree. Do not treat
 - Show that the correction itself changes selection to the intended SKU; no invented sales/conversion lift.
 - Complete the exact corrected-SKU buyer-approved PayPal Sandbox transaction and verify authoritative capture.
 
-## Unresolved blockers to report, not silently waive
+## Historical early blockers — superseded where later evidence says so
+
+The list below records an earlier state and is retained as an audit trail, not as the current release status. Later records document that the app and tests ran, the active seed became team-authored synthetic data, live NVIDIA inference passed, and one PayPal Sandbox order was authoritatively verified. Those later results supersede only claims they directly test; the full P0 matrix has not been executed end-to-end, and stable public hosting/clean-browser deployment verification remain open. This is still a single-workspace demo, not multi-tenant production auth.
 
 1. The updated contract specifies single-workspace demo auth, signed HttpOnly/Secure/SameSite=Lax sessions, server-derived `approvedBy`, origin/CSRF checks, rate/body limits and a restricted reset. These are specified but unverified; P0-12, P0-22 and P0-27 remain release gates. This is not multi-tenant production auth.
 2. No runnable app existed at the time this matrix was drafted; no tests or end-to-end run have been performed by QA.
@@ -247,4 +249,36 @@ This section supersedes the earlier intermediate failure counts above; those ent
 
 - Captain’s independent review found no mismatch in the audit-view API: query-test views include linked run/correction events, while direct run/correction filters remain exact. The route regression covers created → before run → correction proposed/approved → after replay and verifies `supported_match`.
 - Focused audit-route/UI tests passed 8/8. Sequential current-build runs: `npm test` — 65 passed, 0 failed, 2 opt-in live-AI skips; `npm run test:live` — 67 passed, 0 failed, 0 skipped, including live NVIDIA inference. Neither suite called PayPal or approved/captured the pending order.
-- Remaining release blockers are the Sandbox currency-preference persistence / buyer approval and stable judge hosting. The pending USD 24.00 Sandbox order remains uncaptured.
+- At 23:03, the earlier Sandbox currency/preference gate was unresolved; this historical blocker is superseded by the completed 23:31 Sandbox transaction below.
+
+
+## PayPal Sandbox end-to-end pass — Nov 9, 2026, 23:31 IST
+
+- With owner approval, Doom created one US Personal Sandbox buyer and completed one checkout for `CCS-CANVAS-TOTE-ECRU-01`, quantity 1, USD 24.00. PayPal order `9CG69864LK862084H` and capture `6VR778831W402035T` both read `COMPLETED`.
+- Fresh CatalogProof and PayPal readbacks confirmed `verifiedPaid: true` and exactly one capture. No real money moved. The older pending order and all seller settings were left untouched.
+- This is the first real Sandbox transaction proof for CatalogProof; mocked tests remain distinct from this result.
+
+
+## Current release-gate snapshot — Nov 9, 2026, 23:35 IST
+
+- PayPal Sandbox E2E: PASS for one US Personal test buyer, one order for `CCS-CANVAS-TOTE-ECRU-01`, quantity 1, USD 24.00, and exactly one completed capture. Order `9CG69864LK862084H` and capture `6VR778831W402035T` read `COMPLETED`; fresh app/provider readbacks confirmed `verifiedPaid: true`. No real money moved. The older pending order remains separate, uncaptured, and unlinked after the approved local reset.
+- Tests: `npm test` — 65 passed, 0 failed, 2 opt-in live-AI skips; `npm run test:live` — 67 passed, 0 failed, 0 skipped. Public 3002 live UI smoke passed diagnosis, correction approval, identical-query replay, and six-event audit display.
+- Remaining: recording and checking a public YouTube video under 3 minutes, then completing the Devpost fields/submission. Port 3002 is temporary; keep it available through judging or use the complete repository run instructions already provided. The scenario shows conflict resolution, not an incorrect-SKU-to-correct-SKU flip.
+
+
+## Post-review hardening and final verification — Nov 10, 2026, 00:05 IST
+
+- Static review found that paid-state readback previously inspected only the latest capture. The server now marks a `COMPLETED` PayPal order as paid only when the order has exactly one capture, that capture is `COMPLETED`, and its currency/amount match the frozen checkout. A completed order with multiple captures fails closed as `mismatch` in both readback and capture retry paths.
+- Added a mocked route regression that injects a second completed capture and confirms `verifiedPaid: false` / `status: mismatch`. `node --test test/server-flow.test.js` passed; final `npm test` passed 65 tests, failed 0, skipped 2 opt-in live-AI tests; final `npm run test:live` passed 67, failed 0, skipped 0, including live NVIDIA fixture inference. The test suites made no PayPal calls; the live suite made AI requests only.
+- No new Sandbox order, reset, browser operation, or change to PayPal settings occurred. The previously documented order/capture proof remains the only actual Sandbox transaction in this task.
+- The public repository still points at `5db70de`; the exact-one-capture server/test change and submission/QA documentation edits are uncommitted local changes. They are not available to judges from the public repository until published.
+- The public UI smoke and responsive/accessibility checks recorded earlier were team-reported/historical evidence; this pass did not use a browser because the shared browser is reserved for recording. The VM-based UI tests are not browser visual QA. The full P0 matrix and a clean-browser stable-deployment test remain incomplete. Keep the demo single-process; sessions/login counters are in-memory, and production/multi-worker hardening (including shared rate limits) is out of scope.
+- Remaining release tasks: finish and publish a truthful under-3-minute demo video, arrange judge access that lasts through judging, publish the final repository revision, and complete the user's manual Devpost submission. Do not claim the submission is done before it is sent.
+
+
+## Latest release check — Nov 10, 2026, 00:12 IST
+
+- Captain’s HTTPS-origin regression now rejects an `http://` Origin even when its host matches the configured HTTPS app origin. This closes the independent production-mode probe. Payment hardening also requires exactly one completed capture whose amount and currency match the frozen checkout; missing provider capture status does not inherit a stale saved `COMPLETED` value. These are code-path checks, not changes to the actual completed Sandbox order.
+- Latest suites after these changes: `npm test` — 66 passed, 0 failed, 2 opt-in live-AI skips; `npm run test:live` — 68 passed, 0 failed, 0 skipped. The live suite exercised NVIDIA on the synthetic fixture; neither suite called PayPal. The recorded Sandbox order remains the only real CatalogProof transaction in this task.
+- A narrated, captioned local video is complete at 1:49 (H.264 1280×720, AAC narration, embedded captions; SRT sidecar also available). Its source app footage is unchanged. The story stays honest: the intended SKU was selected both before and after, so it shows conflict resolution rather than a wrong-to-right SKU flip. No video has been uploaded; the public YouTube URL and Devpost submission remain pending.
+- The repo and deployment remain separate gates: `origin/main` is still at `5db70de` while intended source/docs changes are local and uncommitted. Port 3002 is temporary; the README contains local run instructions. The full P0 matrix and a fresh clean-browser check are not complete. Do not describe the preview as durable or the app as production-ready.

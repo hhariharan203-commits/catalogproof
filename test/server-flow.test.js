@@ -52,9 +52,10 @@ function modelAnswer(payload) {
 test('actual routes compose import → AI diagnosis → seller approval → replay → PayPal readback', async (t) => {
   const port = await reservePort();
   base = `http://127.0.0.1:${port}`;
+  const publicOrigin = `https://127.0.0.1:${port}`;
   Object.assign(process.env, {
     PORT: String(port), DATABASE_PATH: ':memory:', DEMO_PASSWORD: password,
-    SESSION_SECRET: sessionSecret, NODE_ENV: 'test', PUBLIC_BASE_URL: `https://127.0.0.1:${port}`,
+    SESSION_SECRET: sessionSecret, NODE_ENV: 'test', PUBLIC_BASE_URL: publicOrigin,
     AI_BASE_URL: 'https://ai.example.test/v1', AI_API_KEY: 'fake-integration-key', AI_MODEL: 'integration-test-model',
     PAYPAL_CLIENT_ID: 'fake-client-id', PAYPAL_CLIENT_SECRET: 'fake-client-secret',
     PAYPAL_API_BASE: 'https://api-m.sandbox.paypal.com',
@@ -119,7 +120,7 @@ test('actual routes compose import → AI diagnosis → seller approval → repl
     if (fetchWasReplaced) globalThis.fetch = originalFetch;
   });
 
-  const call = async (route, { method = 'GET', body, cookie = '', csrf = '', origin = base } = {}) => {
+  const call = async (route, { method = 'GET', body, cookie = '', csrf = '', origin = publicOrigin } = {}) => {
     const headers = { origin };
     if (cookie) headers.cookie = cookie;
     if (csrf) headers['x-csrf-token'] = csrf;
@@ -247,6 +248,29 @@ test('actual routes compose import → AI diagnosis → seller approval → repl
   assert.equal(captureCalls, 1);
 
   const completedOrder = orders.get('ORDER-SANDBOX-1');
+  const originalCaptures = completedOrder.purchase_units[0].payments.captures;
+  completedOrder.purchase_units[0].payments.captures = [...originalCaptures, {
+    id: 'CAPTURE-SANDBOX-2', status: 'COMPLETED', amount: { ...originalCaptures[0].amount },
+  }];
+  const multipleCaptureRetry = await call(`/api/checkouts/${checkout.json.checkoutId}/capture`, { method: 'POST', ...auth, body: {} });
+  assert.equal(multipleCaptureRetry.status, 409);
+  assert.equal(multipleCaptureRetry.json.verifiedPaid, false);
+  assert.equal(multipleCaptureRetry.json.status, 'mismatch');
+  const multipleCaptureReadback = await call(`/api/checkouts/${checkout.json.checkoutId}`, { ...auth });
+  assert.equal(multipleCaptureReadback.status, 200);
+  assert.equal(multipleCaptureReadback.json.verifiedPaid, false);
+  assert.equal(multipleCaptureReadback.json.status, 'mismatch');
+  completedOrder.purchase_units[0].payments.captures = originalCaptures;
+
+  const originalCaptureStatus = originalCaptures[0].status;
+  delete originalCaptures[0].status;
+  const missingCaptureStatusReadback = await call(`/api/checkouts/${checkout.json.checkoutId}`, { ...auth });
+  assert.equal(missingCaptureStatusReadback.status, 200);
+  assert.equal(missingCaptureStatusReadback.json.verifiedPaid, false);
+  assert.equal(missingCaptureStatusReadback.json.captureStatus, null);
+  assert.equal(missingCaptureStatusReadback.json.status, 'mismatch');
+  originalCaptures[0].status = originalCaptureStatus;
+
   completedOrder.purchase_units[0].items[0].sku = 'SKU-TAMPERED';
   const mismatchedSkuRetry = await call(`/api/checkouts/${checkout.json.checkoutId}/capture`, { method: 'POST', ...auth, body: {} });
   assert.equal(mismatchedSkuRetry.status, 409);

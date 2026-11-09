@@ -1,61 +1,73 @@
-# CatalogProof — Devpost submission draft
+# CatalogProof — Devpost submission copy
 
-## Title and tagline
+## Project title
 
 CatalogProof
 
+## Tagline
+
 Test the SKU before the buyer pays.
 
-## Project description
+## Short description
 
-An AI shopping agent can understand the product name and still choose the wrong variant. CatalogProof lets a seller test that choice before checkout: freeze one shopper request and expected SKU, inspect the diagnosis against exact catalog evidence, approve or reject a correction, and replay the same request against a new catalog version.
+CatalogProof helps a seller test whether an AI shopping workflow can support the exact product variant a shopper requested—before checkout. It freezes the shopper question and expected SKU, compares the model’s diagnosis with source-backed catalog evidence, puts any correction behind explicit seller approval, and replays the same question against a new catalog version.
 
-The demo uses an original, team-authored fictional two-variant canvas-tote fixture. One imported variant says `Stone` while its source record says `Ecru`. This is a deliberately controlled software-test discrepancy, not a real product, merchant defect, inventory offer, customer demand, sale, or measured business outcome.
+## Inspiration
 
-## What the AI does
+An AI system can understand a product name and still be uncertain about its color, size, or other variant. We wanted a small, inspectable workflow that asks more than “did the model return a product?” It asks whether the selected SKU is supported by the seller’s evidence, what changed after review, and whether a later payment is tied to that exact choice.
 
-NVIDIA hosted NIM diagnoses a bounded set of catalog variants against the frozen shopper request. It can propose a descriptive-field correction only when an exact source quote supports it. Server-side validation checks candidate IDs, constraints, citations, and correction evidence. Unsupported claims fail closed; the model cannot edit the catalog, set availability or price, select payment data, or mark an order paid. A seller explicitly approves or rejects a correction; approval creates a new immutable catalog version.
+## What it does
 
-## What PayPal does
+A merchant imports product-variant data and freezes a shopper request plus its expected SKU. CatalogProof sends a bounded candidate set to NVIDIA hosted NIM for diagnosis, then validates the result server-side: candidate IDs, hard variant constraints, cited fields, and exact source quotes must check out. Unsupported answers fail closed; the model cannot change the catalog or commerce fields.
 
-The app implements PayPal Orders v2 in Sandbox only. The backend creates an order from the frozen, approved SKU snapshot, reads the order back, requires buyer approval before capture, and verifies completed capture details against the saved SKU, quantity, amount, and currency before showing paid.
+The seller can approve or reject a source-supported descriptive correction. Approval creates a new immutable catalog version; the unchanged request is replayed so the before/after result can be compared. Checkout is separate and PayPal Sandbox-only. The backend derives the cart from the approved snapshot, waits for buyer approval, and reports paid only after authoritative readback confirms exactly one completed capture matching the saved SKU, quantity, amount, and currency.
 
-Release disclosure: A USD 24.00 Sandbox order remains `PAYER_ACTION_REQUIRED`. The seller’s receiving preference showed “Saved!” but an authenticated fresh readback showed all three options blank; no buyer approval, capture, or authoritative paid readback has occurred. The owner-approved synthetic baseline reset cleared the app’s local checkout record, but did not cancel the separate pending PayPal order, so it is no longer linked in the current app state. Unit and route tests use mocked PayPal responses and are not transaction proof.
+The current fixture is original team-authored synthetic data: two fictional canvas-tote variants, with one imported color set to `Stone` while its retained source says `Ecru`. This controlled discrepancy is a test fixture—not a real merchant defect, live inventory, sale, customer demand, or business-outcome claim.
 
-## Demo sequence
+## How we built it
 
-1. Show the synthetic two-variant tote catalog and the deliberate Stone/Ecru mismatch.
-2. Freeze the exact request: “Find the Ecru Fieldwork Cotton Canvas Tote.”
-3. Run the live NVIDIA diagnosis and show the actual citations and outcome.
-4. If the validated evidence supports it, review and approve the Stone-to-Ecru correction as the seller.
-5. Replay the unchanged query against the new catalog version and show the exact SKU result.
-6. **Pending:** show PayPal Sandbox buyer approval, server-side capture, and authoritative PayPal readback only after that transaction has actually succeeded.
-7. Close on the audit trail and repeat that the fixture is synthetic and demonstrates controlled software behavior, not merchant results.
+The app uses Node.js 24, Node’s built-in HTTP server and SQLite, and a responsive HTML/CSS/JavaScript interface. AI requests run server-side through an OpenAI-compatible endpoint, with NVIDIA hosted NIM used for the live fixture tests. PayPal Orders v2 is integrated in Sandbox only. Catalog versions and checkout snapshots are server-owned; the browser redirect alone cannot establish approval or payment.
 
-## Verified checks as of Nov 9, 2026
+## Challenges and what we learned
 
-- `npm test`: 65 passed, 0 failed, 2 opt-in live-AI tests skipped.
-- `npm run test:live`: 67 passed, 0 failed, 0 skipped, including live NVIDIA inference and synthetic before/after replay.
-- Public 3002 smoke passed live diagnosis → seller-approved correction → identical-query replay. The model selected the intended SKU both before and after; it diagnosed `conflicting_evidence` on Stone versus source Ecru, and replay returned `supported_match`. This is a conflict-resolution demo, not a wrong-SKU-to-right-SKU flip.
-- The audit view showed six events after the UI/API fix, and the correction panel displayed the field path and exact source quote. No checkout was started in this smoke.
-- PayPal adapter and route regressions cover Sandbox-only hosts, exact order snapshots, idempotency reuse, completed-order reconciliation, and capture-mismatch rejection with mocked provider responses.
-- Desktop/mobile visual QA reported zero axe violations at 1440px and 390px, and no horizontal overflow at 320px, 390px, or 1440px. This is UI QA, not PayPal or deployment proof.
+The hard part was making evidence and commerce state more trustworthy than a plausible model response. We added strict checks for candidate and citation identity, exact quotes, protected catalog fields, frozen snapshots, idempotent PayPal retries, authoritative order readbacks, and multiple-capture rejection. A successful synthetic test demonstrates controlled software behavior; it does not prove that merchants have this problem at scale or that the product improves sales.
 
-## Release items still pending
+## What’s next
 
-- Real PayPal Sandbox buyer approval, capture, and authoritative readback.
-- A stable public HTTPS deployment and clean-browser end-to-end check. Current port-3002 preview is temporary and should not be presented as stable judge hosting.
-- Public video under 3 minutes, recorded from the actual successful flow and checked at its published URL.
-- Final Devpost fields and links; no submission has been made.
-- Push the current UI/API/test/documentation changes and recheck the public repository head before submission.
+The next steps are a stable judge-facing deployment, broader clearly licensed or explicitly authorized catalogs, baseline comparisons, and more variant-conflict cases. Production or multi-merchant use would also need durable shared sessions, stronger operational controls, and broader security and deployment testing.
 
-## Links
+## Demo walkthrough
 
-- Public source repository: https://github.com/hhariharan203-commits/catalogproof
-- App-code license: MIT, in `LICENSE`.
-- Hosted demo: **PENDING stable deployment and clean-browser check**.
-- Public demo video (under 3 minutes): **PENDING recording and YouTube verification**.
+1. Show the clearly labeled synthetic tote fixture and the deliberate `Stone`/`Ecru` discrepancy.
+2. Freeze the query “Find the Ecru Fieldwork Cotton Canvas Tote” and show the actual live model diagnosis and citations.
+3. If the validated evidence supports the correction, approve it as the seller, then replay the identical query and compare catalog versions.
+4. Show the separate PayPal Sandbox checkout and authoritative completed-payment readback, then close on the audit trail and synthetic-data disclosure.
+
+The observed run selected the intended SKU both before and after the correction: it demonstrates conflict resolution, not an incorrect-SKU-to-correct-SKU flip. Do not script or edit the live model result to imply otherwise.
+
+## Verification and limitations
+
+- Latest `npm test`: 66 passed, 0 failed, 2 opt-in live-AI tests skipped.
+- Latest `npm run test:live`: 68 passed, 0 failed, 0 skipped, including live NVIDIA diagnosis and synthetic before/after replay. These automated tests did not call PayPal.
+- A separate PayPal Sandbox end-to-end transaction for `CCS-CANVAS-TOTE-ECRU-01`, quantity 1, USD 24.00 completed with one verified capture. Order `9CG69864LK862084H` and capture `6VR778831W402035T` read `COMPLETED`; fresh app/provider readbacks confirmed `verifiedPaid: true`. No real money moved. A separate older Sandbox attempt remains pending and uncaptured.
+- Previously reported UI QA found no axe violations at 1440px and 390px, and no horizontal overflow at 320px, 390px, or 1440px. These are UI checks, not proof of a stable deployment. The full P0 security/deployment matrix has not been completed.
+- The app is a single-workspace hackathon demo, not production-ready or multi-tenant software. The current hosted preview is temporary and is not a durable judge link.
+
+## Links and final manual fields
+
+- Source repository: https://github.com/hhariharan203-commits/catalogproof
+- License: MIT (`LICENSE` in the repository).
+- Local owner-review cut: 1:49 narrated and captioned MP4, with an SRT sidecar; the source app footage is unchanged. It is private and is not a public video link.
+- Public YouTube video: pending owner approval, upload, and published-page check. No public video URL is ready yet.
+- Hosted demo: no durable public judge URL is ready. Use the repository’s local setup instructions as the fallback; do not submit a temporary preview as stable hosting.
+
+## Before you submit
+
+1. Publish the current local server/test hardening and final documentation, then verify the public repository shows the intended revision. The public repository currently points to `5db70de`; the latest local changes are not pushed.
+2. Review and approve the local 1:49 narrated/captioned draft, then upload it to public YouTube, check the published page, and add the verified video URL. Keep synthetic-data and PayPal Sandbox labels visible, do not show credentials or personal buyer details, and do not imply a wrong-SKU flip or merchant outcome.
+3. Use the repository’s complete local setup/run instructions for judge access if no durable host is arranged. The preview is temporary and login-protected; do not place the private demo password in public copy.
+4. Add the verified video link and any durable demo link, fill the event-specific Devpost fields, and submit manually. No Devpost submission has been made.
 
 ## Claims to avoid
 
-Do not claim a real merchant catalog, persistent merchant defect, product availability, customer demand, sales or conversion lift, production readiness, or validated superiority over baseline catalog validators. Do not describe a mocked PayPal test as a real transaction. Do not say the project has been submitted until the Devpost submission is actually complete.
+Do not claim real merchant data or a persistent merchant defect, product availability, customer demand, sales/conversion lift, production readiness, multi-tenant security, superiority over baseline validators, or a wrong-SKU-to-right-SKU flip. Do not call mocked PayPal checks real transactions, and do not say the project is submitted until you submit it.

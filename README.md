@@ -15,19 +15,30 @@ PayPal checkout is Sandbox-only. The test suite’s composed flow uses mocked AI
 - For PayPal testing: a PayPal Developer Sandbox REST app and Sandbox buyer account. Never use live credentials.
 - A public HTTPS app origin for PayPal approval/cancel return URLs.
 
+## Judge setup for the full demo
+
+The public repository does not contain provider credentials or a shared demo password. To exercise live inference and checkout, use development/test credentials in your own ignored `.env` file:
+
+1. NVIDIA: create or verify an account at [NVIDIA Build](https://build.nvidia.com/settings/api-keys), generate an API key, and keep it server-side. NVIDIA’s hosted models are available for prototyping subject to the account’s rate limits, terms, and availability; they are not an unlimited production service.
+2. PayPal: use the [REST API getting-started guide](https://developer.paypal.com/api/rest) to create a Sandbox REST app and copy its Sandbox Client ID and secret. Use [Sandbox test accounts](https://developer.paypal.com/sandbox-testing/overview) for a test business seller and personal buyer. Keep `PAYPAL_API_BASE=https://api-m.sandbox.paypal.com`; never use Live credentials or the Live API host.
+3. Set `AI_API_KEY`, the PayPal Sandbox credentials, a strong `DEMO_PASSWORD`, a random `SESSION_SECRET`, and `PUBLIC_BASE_URL` in `.env`. The demo password is per-instance and can be chosen by whoever runs the app; do not publish a shared password. For local UI checks without PayPal checkout, set `PUBLIC_BASE_URL=http://localhost:3000`.
+4. For a full PayPal checkout, use a publicly reachable HTTPS origin. An optional [Cloudflare Quick Tunnel](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/) can provide one without a domain or account: run the app locally with `PUBLIC_BASE_URL=http://localhost:3000`, then in another terminal run `cloudflared tunnel --url http://localhost:3000` and copy the temporary `https://…trycloudflare.com` URL it prints. Stop the app, set `PUBLIC_BASE_URL` in `.env` to that exact HTTPS URL, restart the app, and browse through the tunnel URL (not localhost), keeping `cloudflared` running. The app derives PayPal return/cancel URLs from that origin. Quick Tunnels are for testing, have no uptime guarantee, and the URL stops working when the tunnel stops; anyone who has the URL can reach the local service. Do not present one as durable hosting.
+
+Run the app using the steps below, then sign in with the `DEMO_PASSWORD` you set. The real flow requires the provider keys above; without them the app fails closed rather than inventing AI or payment results. The live NVIDIA test command makes multiple API calls and is optional for simply running the demo.
+
 ## Run locally
 
 ```sh
 cp .env.example .env
 ```
 
-Set a strong `DEMO_PASSWORD` (at least 12 characters) and a random `SESSION_SECRET` (at least 32 characters). Set `PUBLIC_BASE_URL` to the app’s HTTPS origin for PayPal redirects. `npm start` and `npm run dev` load `.env` if it exists, using Node 24’s native optional env-file support; shell/process environment values take precedence. You can also supply settings through your deployment environment.
+Set a strong `DEMO_PASSWORD` (at least 12 characters) and a random `SESSION_SECRET` (at least 32 characters). For local UI checks without checkout, set `PUBLIC_BASE_URL=http://localhost:3000`. For the full PayPal approval flow, set `PUBLIC_BASE_URL` to the public HTTPS origin and open the app through that same origin; see the Judge setup section above. `npm start` and `npm run dev` load `.env` if it exists, using Node 24’s native optional env-file support; shell/process environment values take precedence. You can also supply settings through your deployment environment.
 
 ```sh
 npm start
 ```
 
-Open `http://localhost:3000`. The server creates the SQLite database and loads the fictional seed into an empty database. The public seed can be changed with `DEMO_SEED_PATH`.
+Open the origin configured in `PUBLIC_BASE_URL`. For local UI-only use, that is `http://localhost:3000`; for PayPal checkout, use the configured HTTPS origin in your browser. The server creates the SQLite database and loads the fictional seed into an empty database. The public seed can be changed with `DEMO_SEED_PATH`.
 
 ## Server-side integrations
 
@@ -52,7 +63,7 @@ The NVIDIA hosted NIM endpoint above uses OpenAI-compatible `POST /chat/completi
 npm test
 ```
 
-The current suite covers diagnostic schema/citations and hard constraints, auth/origin/CSRF, catalog validation, seed reset, seller decision, before/after route composition, PayPal adapter behavior, idempotency retries, completed-order reconciliation, and mismatched capture readbacks. External AI/PayPal behavior in the composed route test is mocked. Two live-inference tests are skipped when server-side AI settings are absent. To run the full suite with real NVIDIA calls, configure `AI_BASE_URL`, `AI_API_KEY`, and `AI_MODEL` in your git-ignored `.env`, then run `npm run test:live`; it exercises a diagnosis smoke test and the synthetic before/after replay, makes multiple provider calls, and is subject to NVIDIA’s development rate limits and terms.
+The current suite covers diagnostic schema/citations and hard constraints, auth/origin/CSRF, catalog validation, seed reset, seller decision, before/after route composition, PayPal adapter behavior, idempotency retries, completed-order reconciliation, mismatched capture readbacks, and rejection of multiple captures. External AI/PayPal behavior in the composed route test is mocked. Two live-inference tests are skipped when server-side AI settings are absent. To run the full suite with real NVIDIA calls, configure `AI_BASE_URL`, `AI_API_KEY`, and `AI_MODEL` in your git-ignored `.env`, then run `npm run test:live`; it exercises a diagnosis smoke test and the synthetic before/after replay, makes multiple provider calls, and is subject to NVIDIA’s development rate limits and terms.
 
 ## Demo reset
 
@@ -73,7 +84,7 @@ Use **Reset demo** in the app, or call `POST /api/demo/reset` with the authentic
 
 ## Scope and limitations
 
-This is a hackathon demo, not production-ready multi-tenant software. The app uses one demo merchant login and one SQLite database. Live NVIDIA inference has been exercised against the synthetic fixture; no real catalog defect or merchant outcome is claimed. A USD 24.00 PayPal Sandbox order was created, but buyer approval remains pending. The Sandbox seller’s currency-conversion preference still fails fresh-page readback; no capture or paid readback is verified. Port 3002 is a temporary preview, not stable judge hosting, and the public video and Devpost submission are still pending.
+This is a hackathon demo, not production-ready multi-tenant software. The app uses one demo merchant login and one SQLite database. Live NVIDIA inference has been exercised against the synthetic fixture; no real catalog defect or merchant outcome is claimed. The latest standard test run passed 66 tests with 2 opt-in live-AI tests skipped; `npm run test:live` passed all 68 tests with live NVIDIA fixture inference and no PayPal calls. One PayPal Sandbox order for `CCS-CANVAS-TOTE-ECRU-01`, quantity 1, USD 24.00 completed; fresh PayPal and CatalogProof readbacks confirmed `COMPLETED`, `verifiedPaid: true`, and exactly one capture. No real money moved. An older abandoned Sandbox order remains pending and uncaptured. Port 3002 is a temporary preview, not stable judge hosting. A 1:49 narrated, captioned local review cut exists, but no public YouTube video or Devpost submission is ready yet.
 
 
 ## Synthetic demo walkthrough
@@ -82,6 +93,6 @@ This is a hackathon demo, not production-ready multi-tenant software. The app us
 2. Run the frozen query, “Find the Ecru Fieldwork Cotton Canvas Tote.” The seed deliberately imports that SKU’s color as Stone while its retained team-authored source record says Ecru.
 3. Show the real model’s observed result. It may identify a conflicting variant, propose a cited correction, or abstain; do not script a response or claim a successful selection if it does not happen.
 4. Approve only a correction that the app presents from the validated run and exact source quote. Replay the unchanged query and compare the new version with the original.
-5. Checkout is a separate PayPal Sandbox step. The current order remains pending approval while the receiving-preference behavior is diagnosed; no capture or paid state has been verified. No checkout or payment is simulated by the seed.
+5. Checkout is a separate PayPal Sandbox step. One test order for the exact synthetic SKU has completed with one verified capture; the older abandoned attempt remains pending and uncaptured. No checkout or payment is simulated by the seed.
 
 Use **Reset demo** to restore the fictional two-variant catalog and clear prior demo state. Reset does not create a PayPal transaction.

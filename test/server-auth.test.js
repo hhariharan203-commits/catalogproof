@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import net from 'node:net';
+import http from 'node:http';
 import path from 'node:path';
 
 const ROOT = path.resolve(new URL('..', import.meta.url).pathname);
@@ -34,6 +35,49 @@ async function waitForHealth() {
   }
   throw new Error(`server did not start: ${logs}`);
 }
+
+test('production login rejects an HTTP Origin on the configured HTTPS host', async (t) => {
+  const originPort = await freePort();
+  const localBase = `http://127.0.0.1:${originPort}`;
+  let originLogs = '';
+  const originChild = spawn(process.execPath, ['server/index.js'], {
+    cwd: ROOT,
+    env: { ...process.env, PORT: String(originPort), DATABASE_PATH: ':memory:', DEMO_PASSWORD: PASSWORD,
+      SESSION_SECRET: SECRET, NODE_ENV: 'production', PUBLIC_BASE_URL: 'https://catalog.example.test',
+      AI_API_KEY: '', AI_MODEL: '', PAYPAL_CLIENT_ID: '', PAYPAL_CLIENT_SECRET: '' },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  originChild.stdout.on('data', (chunk) => { originLogs += chunk.toString(); });
+  originChild.stderr.on('data', (chunk) => { originLogs += chunk.toString(); });
+  t.after(() => originChild.kill('SIGTERM'));
+
+  const deadline = Date.now() + 5000;
+  let healthy = false;
+  while (Date.now() < deadline) {
+    if (originChild.exitCode !== null) throw new Error(`origin test server exited early: ${originLogs}`);
+    try {
+      const response = await fetch(`${localBase}/api/health`);
+      if (response.ok) { healthy = true; break; }
+    } catch {}
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  assert.equal(healthy, true, `origin test server did not start: ${originLogs}`);
+
+  const body = JSON.stringify({ password: PASSWORD });
+  const result = await new Promise((resolve, reject) => {
+    const request = http.request({ hostname: '127.0.0.1', port: originPort, path: '/api/auth/login', method: 'POST',
+      headers: { Host: 'catalog.example.test', Origin: 'http://catalog.example.test', 'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(body) } }, (response) => {
+      let text = '';
+      response.on('data', (chunk) => { text += chunk; });
+      response.on('end', () => resolve({ status: response.statusCode, body: text }));
+    });
+    request.on('error', reject);
+    request.end(body);
+  });
+  assert.equal(result.status, 403, result.body);
+  assert.match(result.body, /ORIGIN_REJECTED/);
+});
 
 test('auth routes enforce session, origin and CSRF, and logout clears access', async (t) => {
   port = await freePort();
