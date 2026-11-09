@@ -1,0 +1,19 @@
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+
+# Runtime state and generated files
+node_modules/
+/data/*.sqlite
+/data/*.sqlite-*
+*.log
+coverage/
+
+# Research uploads are local-only; the public README cites the authorized sample source.
+/evidence/
+
+# Editor / generated preview files
+.DS_Store
+.vscode/
+ui/.manus-*.tmp

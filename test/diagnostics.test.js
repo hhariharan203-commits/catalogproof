@@ -1,0 +1,507 @@
+import { after, test } from 'node:test';
+import assert from 'node:assert/strict';
+
+const ENV_KEYS = ['AI_BASE_URL', 'AI_API_KEY', 'AI_MODEL'];
+const originalEnv = Object.fromEntries(ENV_KEYS.map((key) => [key, process.env[key]]));
+const originalFetch = globalThis.fetch;
+
+after(() => {
+  for (const key of ENV_KEYS) {
+    if (originalEnv[key] === undefined) delete process.env[key];
+    else process.env[key] = originalEnv[key];
+  }
+  globalThis.fetch = originalFetch;
+});
+
+function aiEnv(suffix = 'test') {
+  return {
+    AI_BASE_URL: 'https://ai.example.test/v1',
+    AI_API_KEY: `private-test-key-${suffix}`,
+    AI_MODEL: 'fixture-model',
+  };
+}
+
+function candidate({ sku, color, size, available = true, quote = `Color: ${color}; Size: ${size}.`, url = `https://shop.example.test/products/${sku.toLowerCase()}` }) {
+  return {
+    sku,
+    title: 'Trail Runner Shoe',
+    description: 'Synthetic test fixture. Red trail-running shoe.',
+    brand: 'Example Brand',
+    variantAttributes: { Color: color, Size: size },
+    available,
+    sourceRecord: {
+      id: `record-${sku}`,
+      sourceUrl: url,
+      descriptionEvidence: quote,
+      in_stock: available,
+    },
+  };
+}
+
+function input(overrides = {}) {
+  return {
+    queryText: 'Find a red trail runner in size 38',
+    expectedSku: 'SHOE-RED-38',
+    catalogVersion: 'test-version-1',
+    candidates: [
+      candidate({ sku: 'SHOE-RED-38', color: 'Red', size: '38' }),
+      candidate({ sku: 'SHOE-RED-39', color: 'Red', size: '39' }),
+      candidate({ sku: 'SHOE-BLUE-38', color: 'Blue', size: '38' }),
+    ],
+    ...overrides,
+  };
+}
+
+function response(status, payload) {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    async text() { return JSON.stringify(payload); },
+  };
+}
+
+function modelResponse(content, { model = 'fixture-model' } = {}) {
+  return response(200, {
+    id: 'response-fixture',
+    model,
+    choices: [{ message: { role: 'assistant', content: JSON.stringify(content) } }],
+  });
+}
+
+function supportedMatch(sku = 'SHOE-RED-38') {
+  const row = sku === 'SHOE-RED-38'
+    ? { sku, recordId: `record-${sku}`, color: 'Red', size: '38' }
+    : { sku, recordId: `record-${sku}`, color: 'Red', size: '39' };
+  return {
+    selectedSku: sku,
+    outcome: 'supported_match',
+    matchedFacts: [
+      { fieldPath: 'variantAttributes.Color', value: row.color, recordId: row.recordId },
+      { fieldPath: 'variantAttributes.Size', value: row.size, recordId: row.recordId },
+    ],
+    issues: [],
+  };
+}
+
+async function withRuntime({ env = {}, fetchImpl, run }) {
+  for (const key of ENV_KEYS) delete process.env[key];
+  Object.assign(process.env, env);
+  globalThis.fetch = fetchImpl ?? originalFetch;
+  try {
+    return await run();
+  } finally {
+    for (const key of ENV_KEYS) {
+      if (originalEnv[key] === undefined) delete process.env[key];
+      else process.env[key] = originalEnv[key];
+    }
+    globalThis.fetch = originalFetch;
+  }
+}
+
+async function loadDiagnostics() {
+  return import('../server/diagnostics.js');
+}
+
+test('missing AI configuration fails closed without a network request or mock inference', async () => {
+  const { diagnose } = await loadDiagnostics();
+  let calls = 0;
+  await withRuntime({
+    env: {},
+    fetchImpl: async () => { calls += 1; throw new Error('unexpected network call'); },
+    run: async () => {
+      await assert.rejects(diagnose(input()), (error) => {
+        assert.equal(error.code, 'AI_UNAVAILABLE');
+        assert.equal(error.status, 503);
+        assert.equal(String(error).includes('private-test-key'), false);
+        return true;
+      });
+      assert.equal(calls, 0);
+    },
+  });
+});
+
+test('diagnose rejects malformed input before sending any model request', async () => {
+  const { diagnose } = await loadDiagnostics();
+  let calls = 0;
+  await withRuntime({
+    env: aiEnv('invalid-input'),
+    fetchImpl: async () => { calls += 1; throw new Error('unexpected network call'); },
+    run: async () => {
+      await assert.rejects(diagnose(input({ expectedSku: 'SKU-NOT-IN-CANDIDATES' })), (error) => {
+        assert.equal(error.code, 'INVALID_AI_INPUT');
+        assert.equal(error.status, 400);
+        return true;
+      });
+      assert.equal(calls, 0);
+    },
+  });
+});
+
+test('model request is server-side, candidate-limited, JSON-constrained and validated against exact citations', async () => {
+  const { diagnose } = await loadDiagnostics();
+  const calls = [];
+  await withRuntime({
+    env: aiEnv('request-shape'),
+    fetchImpl: async (url, options) => {
+      calls.push({ url: new URL(url), options });
+      return modelResponse(supportedMatch());
+    },
+    run: async () => {
+      const result = await diagnose(input());
+      assert.equal(result.selectedSku, 'SHOE-RED-38');
+      assert.equal(result.outcome, 'supported_match');
+      assert.equal(result.matchedFacts.length, 2);
+      assert.deepEqual(result.issues, []);
+      assert.equal(calls.length, 1);
+      assert.equal(calls[0].url.href, 'https://ai.example.test/v1/chat/completions');
+      assert.equal(calls[0].options.method, 'POST');
+      assert.equal(calls[0].options.redirect, 'error');
+      assert.equal(calls[0].options.headers.Authorization, `Bearer ${aiEnv('request-shape').AI_API_KEY}`);
+      const body = JSON.parse(calls[0].options.body);
+      assert.equal(body.model, 'fixture-model');
+      assert.equal(body.temperature, 0);
+      assert.deepEqual(body.response_format, { type: 'json_object' });
+      assert.equal(body.stream, false);
+      assert.equal(body.messages.length, 2);
+      const payload = JSON.parse(body.messages[1].content);
+      assert.equal(payload.queryText, input().queryText);
+      assert.equal(payload.catalogVersion, 'test-version-1');
+      assert.ok(payload.availableSkus.includes('SHOE-RED-38'));
+      assert.ok(payload.candidates.every((row) => input().candidates.some((item) => item.sku === row.sku)));
+      assert.ok(payload.candidates.length <= 12);
+      assert.equal(JSON.stringify(payload).includes(aiEnv('request-shape').AI_API_KEY), false);
+    },
+  });
+});
+
+test('hard variant constraints reject a model-selected nonmatching candidate', async () => {
+  const { diagnose } = await loadDiagnostics();
+  await withRuntime({
+    env: aiEnv('hard-constraint'),
+    fetchImpl: async () => modelResponse(supportedMatch('SHOE-RED-39')),
+    run: async () => {
+      await assert.rejects(diagnose(input()), (error) => {
+        assert.equal(error.code, 'AI_INVALID_RESPONSE');
+        assert.equal(error.status, 502);
+        return true;
+      });
+    },
+  });
+});
+
+test('explicitly unavailable variants are never selectable', async () => {
+  const { diagnose } = await loadDiagnostics();
+  let payload;
+  const unavailableInput = input({
+    candidates: [
+      candidate({ sku: 'SHOE-RED-38', color: 'Red', size: '38', available: false }),
+      candidate({ sku: 'SHOE-RED-39', color: 'Red', size: '39', available: true }),
+    ],
+  });
+  const uncertain = {
+    selectedSku: null,
+    outcome: 'insufficient_evidence',
+    matchedFacts: [],
+    issues: [],
+    uncertaintyReason: 'The only exact variant is marked unavailable in the supplied catalog record.',
+  };
+  await withRuntime({
+    env: aiEnv('unavailable'),
+    fetchImpl: async (_url, options) => {
+      payload = JSON.parse(options.body);
+      return modelResponse(uncertain);
+    },
+    run: async () => {
+      const result = await diagnose(unavailableInput);
+      assert.equal(result.selectedSku, null);
+      assert.equal(result.outcome, 'insufficient_evidence');
+      const modelInput = JSON.parse(payload.messages[1].content);
+      assert.ok(!modelInput.availableSkus.includes('SHOE-RED-38'));
+      assert.ok(modelInput.availableSkus.includes('SHOE-RED-39'));
+    },
+  });
+});
+
+test('a requested size absent from the catalog cannot be returned as a supported match', async () => {
+  const { diagnose } = await loadDiagnostics();
+  let requestPayload;
+  const query = input({ queryText: 'Find a red trail runner size 42' });
+  const uncertain = {
+    selectedSku: null,
+    outcome: 'insufficient_evidence',
+    matchedFacts: [],
+    issues: [],
+    uncertaintyReason: 'The catalog does not contain the requested size.',
+  };
+  await withRuntime({
+    env: aiEnv('size-not-found'),
+    fetchImpl: async (_url, options) => {
+      requestPayload = JSON.parse(options.body);
+      return modelResponse(uncertain);
+    },
+    run: async () => {
+      const result = await diagnose(query);
+      assert.equal(result.selectedSku, null);
+      assert.equal(result.outcome, 'insufficient_evidence');
+      const modelInput = JSON.parse(requestPayload.messages[1].content);
+      assert.ok(modelInput.availableSkus.length > 0);
+      assert.ok(modelInput.hardConstraints.some((constraint) => constraint.key === 'Size' && constraint.unmatched));
+    },
+  });
+});
+
+test('an absent-size query may return an available variant only as a cited conflict', async (t) => {
+  const { diagnose } = await loadDiagnostics();
+  const query = input({ queryText: 'Find a red trail runner size 42' });
+  await t.test('cited mismatch is allowed as conflicting_evidence', async () => {
+    const conflict = {
+      selectedSku: 'SHOE-RED-39',
+      outcome: 'conflicting_evidence',
+      matchedFacts: [],
+      issues: [{
+        type: 'size_mismatch',
+        fieldPath: 'variantAttributes.Size',
+        actualValue: '39',
+        expectedOrMissingValue: null,
+        evidence: [{ sku: 'SHOE-RED-39', fieldPath: 'variantAttributes.Size', value: '39', recordId: 'record-SHOE-RED-39' }],
+        explanation: 'The catalog has size 39, not the requested size 42.',
+      }],
+      correctionDraft: null,
+      uncertaintyReason: null,
+    };
+    await withRuntime({
+      env: aiEnv('size-conflict'),
+      fetchImpl: async (_url, options) => {
+        const payload = JSON.parse(JSON.parse(options.body).messages[1].content);
+        assert.ok(payload.availableSkus.includes('SHOE-RED-39'));
+        assert.ok(payload.hardConstraints.some((constraint) => constraint.key === 'Size' && constraint.unmatched));
+        return modelResponse(conflict);
+      },
+      run: async () => {
+        const result = await diagnose(query);
+        assert.equal(result.selectedSku, 'SHOE-RED-39');
+        assert.equal(result.outcome, 'conflicting_evidence');
+        assert.ok(result.issues.some((issue) => issue.type === 'size_mismatch'));
+      },
+    });
+  });
+  await t.test('same mismatch is rejected if labeled supported_match', async () => {
+    await withRuntime({
+      env: aiEnv('size-false-match'),
+      fetchImpl: async () => modelResponse({ ...supportedMatch('SHOE-RED-39'), correctionDraft: null }),
+      run: async () => {
+        await assert.rejects(diagnose(query), (error) => error.code === 'AI_INVALID_RESPONSE');
+      },
+    });
+  });
+});
+
+test('a model cannot select an unavailable exact-match SKU', async () => {
+  const { diagnose } = await loadDiagnostics();
+  const query = input({
+    candidates: [
+      candidate({ sku: 'SHOE-RED-38', color: 'Red', size: '38', available: false }),
+      candidate({ sku: 'SHOE-RED-39', color: 'Red', size: '39', available: true }),
+    ],
+  });
+  await withRuntime({
+    env: aiEnv('select-unavailable'),
+    fetchImpl: async () => modelResponse(supportedMatch()),
+    run: async () => {
+      await assert.rejects(diagnose(query), (error) => error.code === 'AI_INVALID_RESPONSE');
+    },
+  });
+});
+
+test('stale nested availability false overrides a higher-level true flag', async () => {
+  const { diagnose } = await loadDiagnostics();
+  const query = input({
+    candidates: [
+      {
+        ...candidate({ sku: 'SHOE-RED-38', color: 'Red', size: '38', available: true }),
+        sourceRecord: { id: 'product-record', variants: [{ sku: 'SHOE-RED-38', in_stock: false }] },
+      },
+      candidate({ sku: 'SHOE-RED-39', color: 'Red', size: '39', available: true }),
+    ],
+  });
+  await withRuntime({
+    env: aiEnv('nested-stale-availability'),
+    fetchImpl: async (_url, options) => {
+      const payload = JSON.parse(JSON.parse(options.body).messages[1].content);
+      assert.ok(!payload.availableSkus.includes('SHOE-RED-38'));
+      assert.ok(payload.availableSkus.includes('SHOE-RED-39'));
+      return modelResponse({
+        selectedSku: null,
+        outcome: 'insufficient_evidence',
+        matchedFacts: [],
+        issues: [],
+        uncertaintyReason: 'The exact SKU is marked unavailable in the source record.',
+      });
+    },
+    run: async () => {
+      const result = await diagnose(query);
+      assert.equal(result.selectedSku, null);
+      assert.notEqual(result.outcome, 'supported_match');
+    },
+  });
+});
+
+test('unknown SKU selection and incorrect field citations are rejected', async (t) => {
+  const { diagnose } = await loadDiagnostics();
+  const cases = [
+    {
+      name: 'unknown SKU',
+      model: { ...supportedMatch(), selectedSku: 'NOT-IN-CATALOG' },
+    },
+    {
+      name: 'wrong cited value',
+      model: {
+        ...supportedMatch(),
+        matchedFacts: [{ fieldPath: 'variantAttributes.Color', value: 'Green', recordId: 'record-SHOE-RED-38' }],
+      },
+    },
+    {
+      name: 'unknown citation path',
+      model: {
+        ...supportedMatch(),
+        matchedFacts: [{ fieldPath: 'variantAttributes.__proto__', value: 'polluted', recordId: 'record-SHOE-RED-38' }],
+      },
+    },
+  ];
+  for (const item of cases) {
+    await t.test(item.name, async () => {
+      await withRuntime({
+        env: aiEnv(`invalid-${item.name.replaceAll(' ', '-')}`),
+        fetchImpl: async () => modelResponse(item.model),
+        run: async () => {
+          await assert.rejects(diagnose(input()), (error) => error.code === 'AI_INVALID_RESPONSE');
+        },
+      });
+    });
+  }
+});
+
+test('expected-SKU mismatch is explicitly diagnosed from exact variant records', async () => {
+  const { diagnose } = await loadDiagnostics();
+  await withRuntime({
+    env: aiEnv('expected-mismatch'),
+    fetchImpl: async () => modelResponse(supportedMatch('SHOE-RED-39')),
+    run: async () => {
+      // Use a query without an explicit size constraint so the wrong-variant run reaches the validator.
+      const result = await diagnose(input({ queryText: 'Find a red trail runner' }));
+      assert.equal(result.selectedSku, 'SHOE-RED-39');
+      assert.equal(result.outcome, 'conflicting_evidence');
+      const mismatch = result.issues.find((issue) => issue.type === 'expected_variant_mismatch');
+      assert.ok(mismatch);
+      assert.equal(mismatch.actualValue, '39');
+      assert.equal(mismatch.expectedOrMissingValue, '38');
+      assert.equal(mismatch.evidence.length, 2);
+    },
+  });
+});
+
+test('correction draft must cite an exact source quote and cannot alter protected commerce fields', async (t) => {
+  const { diagnose } = await loadDiagnostics();
+  const row = candidate({ sku: 'SHOE-RED-38', color: 'Red', size: '38', quote: 'Color: Red; fit note: true to size.' });
+  const withCorrectionInput = input({ candidates: [row] });
+  const validDraft = {
+    selectedSku: 'SHOE-RED-38',
+    outcome: 'supported_match',
+    matchedFacts: [],
+    issues: [],
+    correctionDraft: {
+      sku: 'SHOE-RED-38',
+      fieldPath: 'variantAttributes.Color',
+      proposedValue: 'Red',
+      evidence: [{
+        sourceType: 'catalog_record',
+        sourceReference: 'https://shop.example.test/products/shoe-red-38',
+        exactQuote: 'Color: Red; fit note: true to size.',
+        recordId: 'record-SHOE-RED-38',
+      }],
+      explanation: 'The source states the color is red.',
+    },
+  };
+  const cases = [
+    { name: 'accept exact source quote', model: validDraft, shouldPass: true },
+    {
+      name: 'reject an invented quote',
+      model: { ...validDraft, correctionDraft: { ...validDraft.correctionDraft, proposedValue: 'Blue' } },
+      shouldPass: false,
+    },
+    {
+      name: 'reject price corrections',
+      model: { ...validDraft, correctionDraft: { ...validDraft.correctionDraft, fieldPath: 'price', proposedValue: '9.99' } },
+      shouldPass: false,
+    },
+    {
+      name: 'reject stock corrections',
+      model: { ...validDraft, correctionDraft: { ...validDraft.correctionDraft, fieldPath: 'availability', proposedValue: 'true' } },
+      shouldPass: false,
+    },
+  ];
+  for (const item of cases) {
+    await t.test(item.name, async () => {
+      await withRuntime({
+        env: aiEnv(`correction-${item.name.replaceAll(' ', '-')}`),
+        fetchImpl: async () => modelResponse(item.model),
+        run: async () => {
+          if (item.shouldPass) {
+            const result = await diagnose(withCorrectionInput);
+            assert.equal(result.correctionDraft.proposedValue, 'Red');
+            assert.match(result.correctionDraft.explanation, /seller approval/i);
+          } else {
+            await assert.rejects(diagnose(withCorrectionInput), (error) => error.code === 'AI_INVALID_RESPONSE');
+          }
+        },
+      });
+    });
+  }
+});
+
+test('provider failures, invalid JSON and unsafe base URLs are reported safely', async (t) => {
+  const { diagnose } = await loadDiagnostics();
+  await t.test('HTTP failure does not leak provider body or key', async () => {
+    const secret = aiEnv('http-failure').AI_API_KEY;
+    await withRuntime({
+      env: aiEnv('http-failure'),
+      fetchImpl: async () => ({ ok: false, status: 429, async text() { return secret; } }),
+      run: async () => {
+        await assert.rejects(diagnose(input()), (error) => {
+          assert.equal(error.code, 'AI_UNAVAILABLE');
+          assert.equal(error.status, 503);
+          assert.equal(String(error).includes(secret), false);
+          return true;
+        });
+      },
+    });
+  });
+  await t.test('invalid provider JSON is rejected', async () => {
+    await withRuntime({
+      env: aiEnv('invalid-json'),
+      fetchImpl: async () => ({ ok: true, status: 200, async text() { return 'not-json'; } }),
+      run: async () => {
+        await assert.rejects(diagnose(input()), (error) => error.code === 'AI_INVALID_RESPONSE');
+      },
+    });
+  });
+  await t.test('non-HTTPS provider base is rejected without a request', async () => {
+    let calls = 0;
+    await withRuntime({
+      env: { ...aiEnv('unsafe-base'), AI_BASE_URL: 'http://ai.example.test/v1' },
+      fetchImpl: async () => { calls += 1; throw new Error('unexpected network call'); },
+      run: async () => {
+        await assert.rejects(diagnose(input()), (error) => error.code === 'AI_UNAVAILABLE');
+        assert.equal(calls, 0);
+      },
+    });
+  });
+});
+
+const liveInferenceConfigured = ENV_KEYS.every((key) => process.env[key]?.trim());
+test('live AI inference smoke (not mocked)', { skip: liveInferenceConfigured ? false : 'AI_BASE_URL, AI_API_KEY and AI_MODEL are not configured in this environment.' }, async () => {
+  const { diagnose } = await loadDiagnostics();
+  const result = await diagnose(input());
+  assert.ok(['supported_match', 'conflicting_evidence', 'insufficient_evidence', 'ambiguous'].includes(result.outcome));
+  assert.ok(result.selectedSku === null || input().candidates.some((row) => row.sku === result.selectedSku));
+});

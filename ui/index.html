@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f3f4f0">
+  <meta name="description" content="CatalogProof tests product-variant selection against real catalog evidence.">
+  <title>CatalogProof — Product selection proof</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/app.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to workflow</a>
+
+  <section id="loginScreen" class="login-screen" hidden aria-labelledby="loginTitle">
+    <div class="login-sheet">
+      <div class="brand-lockup">
+        <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span>CatalogProof</span>
+      </div>
+      <p class="eyebrow">PRIVATE DEMO WORKSPACE</p>
+      <h1 id="loginTitle">Open the<br><em>proof bench.</em></h1>
+      <p class="login-copy">This single-merchant demonstration is protected. Enter the demo password supplied by the project owner.</p>
+      <form id="loginForm" class="login-form">
+        <label for="password">Demo password</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required>
+        <button class="button button-primary" type="submit">Enter workspace <span aria-hidden="true">↗</span></button>
+        <p id="loginMessage" class="form-message" aria-live="polite"></p>
+      </form>
+      <p class="fine-print">Sandbox only · no live customer payment</p>
+    </div>
+    <div class="login-art" aria-hidden="true">
+      <div class="art-crosshair"></div>
+      <div class="art-orbit art-orbit-a"></div>
+      <div class="art-orbit art-orbit-b"></div>
+      <div class="art-core"><span>SKU</span><b>?</b></div>
+      <div class="art-caption">EVIDENCE / VARIANT / PURCHASE</div>
+    </div>
+  </section>
+
+  <div id="appShell" class="app-shell" hidden>
+    <header class="topbar">
+      <a class="brand-lockup" href="#top" aria-label="CatalogProof home">
+        <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span>CatalogProof</span>
+      </a>
+      <div class="topbar-center"><span class="topbar-label">PRODUCT INTEGRITY / DEMO</span></div>
+      <div class="topbar-actions">
+        <span id="connectionBadge" class="connection-badge" role="status">Checking services</span>
+        <button id="resetButton" class="text-button" type="button">Reset demo</button>
+        <button id="logoutButton" class="text-button" type="button">Sign out</button>
+      </div>
+    </header>
+
+    <main id="main">
+      <section id="top" class="opening">
+        <div class="opening-copy">
+          <p class="eyebrow"><span class="signal-dot"></span> THE VARIANT PROOF BENCH</p>
+          <h1>Does the right<br>question reach the<br><em>right product?</em></h1>
+          <p class="opening-deck">Replay one shopper request against a frozen catalog. See the SKU an AI selects, inspect the evidence, approve a supported fix, then test the same request again.</p>
+          <a class="jump-link" href="#workflow">Start with a catalog <span aria-hidden="true">↓</span></a>
+        </div>
+        <div class="opening-figure" aria-label="The test sequence: shopper query, catalog evidence, seller decision, and purchase verification">
+          <div class="figure-head"><span>TEST SEQUENCE</span><span>01 — 04</span></div>
+          <div class="sequence-row"><span class="sequence-index">01</span><span class="sequence-name">SHOPPER QUERY</span><span class="sequence-state">FROZEN</span></div>
+          <div class="sequence-row"><span class="sequence-index">02</span><span class="sequence-name">SKU SELECTION</span><span class="sequence-state">OBSERVED</span></div>
+          <div class="sequence-row"><span class="sequence-index">03</span><span class="sequence-name">SELLER REVIEW</span><span class="sequence-state">REQUIRED</span></div>
+          <div class="sequence-row"><span class="sequence-index">04</span><span class="sequence-name">PAYPAL CAPTURE</span><span class="sequence-state">READ BACK</span></div>
+          <div class="figure-foot"><span>NO SILENT CATALOG CHANGES</span><span>NO FRONTEND PAYMENT CLAIMS</span></div>
+        </div>
+      </section>
+
+      <div id="globalNotice" class="global-notice" role="status" aria-live="polite" hidden></div>
+
+      <section id="workflow" class="workflow-layout" aria-label="CatalogProof workflow">
+        <aside class="source-rail" aria-labelledby="sourceTitle">
+          <div class="section-label"><span>01</span><span>SOURCE</span></div>
+          <h2 id="sourceTitle">Catalog</h2>
+          <p class="rail-copy">One row per purchasable variant. Original data stays available for comparison.</p>
+
+          <div id="catalogSummary" class="catalog-summary">
+            <span class="summary-empty">No catalog loaded</span>
+          </div>
+
+          <details id="importDetails" class="import-details">
+            <summary><span>Import JSON</span><span aria-hidden="true">＋</span></summary>
+            <form id="importForm" class="import-form">
+              <label for="catalogFile">Catalog file</label>
+              <input id="catalogFile" type="file" accept="application/json,.json" required>
+              <p class="field-help">Accepts CatalogProof <code>items</code> JSON or a product list with nested variants. Large catalogs may exceed the demo server’s upload limit.</p>
+              <label for="sourceName">Source name</label>
+              <input id="sourceName" name="sourceName" type="text" maxlength="120" placeholder="Name this source" required>
+              <label for="sourceUrl">Source URL <span class="optional">optional</span></label>
+              <input id="sourceUrl" name="sourceUrl" type="url" maxlength="1000" placeholder="https://…">
+              <label for="sourceLicense">License or permission note <span class="optional">optional</span></label>
+              <input id="sourceLicense" name="sourceLicense" type="text" maxlength="300" placeholder="e.g. MIT, public feed, authorized merchant export">
+              <label class="check-row" for="syntheticData">
+                <input id="syntheticData" type="checkbox">
+                <span>This catalog is synthetic test data</span>
+              </label>
+              <label class="check-row consent-row" for="catalogConsent">
+                <input id="catalogConsent" type="checkbox" required>
+                <span>I have permission to use this catalog. I will not upload private merchant data to this public demo.</span>
+              </label>
+              <button id="importButton" class="button button-secondary" type="submit">Import source</button>
+              <p id="importMessage" class="form-message" aria-live="polite"></p>
+            </form>
+          </details>
+
+          <div class="product-list-wrap">
+            <div class="list-heading"><span>VARIANTS</span><span id="variantCount">—</span></div>
+            <label class="sr-only" for="productSearch">Filter catalog variants</label>
+            <input id="productSearch" class="search-input" type="search" placeholder="Find a product or SKU" disabled>
+            <div id="productList" class="product-list" aria-live="polite">
+              <p class="empty-note">Import a permitted catalog to inspect its variants.</p>
+            </div>
+          </div>
+          <p class="rail-footnote">A catalog snapshot is not a live inventory check. Availability is only as current as its source.</p>
+        </aside>
+
+        <div class="proof-flow">
+          <section class="flow-section query-section" aria-labelledby="queryTitle">
+            <div class="section-label"><span>02</span><span>REPRODUCE</span></div>
+            <div class="section-heading-row">
+              <div>
+                <h2 id="queryTitle">Set the shopper’s question.</h2>
+                <p>Choose the SKU the seller expects, then hold the query fixed for the before-and-after test.</p>
+              </div>
+              <span id="testVersionLabel" class="version-tag">NO TEST FROZEN</span>
+              <button id="newTestButton" class="button button-secondary" type="button" hidden>Start a new test</button>
+            </div>
+            <form id="queryForm" class="query-form">
+              <div class="query-field">
+                <label for="queryText">Natural-language request</label>
+                <textarea id="queryText" rows="3" maxlength="1200" placeholder="Example: Find me the black option in size 36, US 5." required disabled></textarea>
+              </div>
+              <div class="query-bottom">
+                <div class="expected-field">
+                  <label for="expectedSku">Seller’s intended SKU</label>
+                  <input id="expectedSku" type="text" autocomplete="off" placeholder="Choose a variant from the catalog list" required disabled readonly>
+                  <span id="expectedSummary" class="field-help">Choose a catalog row from the source list. This is the test’s expected answer, not an independent product claim.</span>
+                </div>
+                <button id="freezeTestButton" class="button button-primary" type="submit" disabled>Freeze &amp; run before test <span aria-hidden="true">↗</span></button>
+              </div>
+            </form>
+          </section>
+
+          <section id="beforeSection" class="flow-section result-section" aria-labelledby="beforeTitle" hidden>
+            <div class="section-label"><span>03</span><span>OBSERVED</span></div>
+            <div class="section-heading-row">
+              <div>
+                <h2 id="beforeTitle">The first selection.</h2>
+                <p id="beforeSubhead">AI result and its source-backed diagnosis.</p>
+              </div>
+              <span id="beforeOutcome" class="outcome-pill">—</span>
+            </div>
+              <div class="selection-sheet">
+              <div class="selection-copy">
+                <p class="micro-label">SELECTED PRODUCT / SKU</p>
+                <h3 id="beforeProduct">Waiting for a test</h3>
+                <p id="beforeVariant" class="variant-line">—</p>
+              </div>
+                <div class="sku-stamp"><span>SKU</span><strong id="beforeSku">—</strong></div>
+              </div>
+              <div class="frozen-query">
+                <div><span class="micro-label">FROZEN SHOPPER QUERY</span><p id="frozenQueryText">—</p></div>
+                <div><span class="micro-label">EXPECTED SKU</span><strong id="frozenExpectedSku">—</strong></div>
+              </div>
+              <div id="diagnosisBlock" class="diagnosis-block" hidden>
+              <div class="diagnosis-heading"><span class="signal-marker" aria-hidden="true"></span><h3>What the evidence says</h3></div>
+              <div id="issueList" class="issue-list"></div>
+              <div id="uncertaintyNote" class="uncertainty-note" hidden></div>
+            </div>
+          </section>
+
+          <section id="correctionSection" class="flow-section correction-section" aria-labelledby="correctionTitle" hidden>
+            <div class="section-label"><span>04</span><span>SELLER DECISION</span></div>
+            <div class="section-heading-row">
+              <div>
+                <h2 id="correctionTitle">Review before changing anything.</h2>
+                <p>The original stays intact. A correction creates a new catalog version only after seller approval.</p>
+              </div>
+              <span id="correctionStatus" class="outcome-pill">REVIEW REQUIRED</span>
+            </div>
+            <div class="correction-sheet">
+              <div class="value-diff">
+                <div class="diff-value"><span class="micro-label">CURRENT VALUE</span><strong id="originalValue">—</strong></div>
+                <span class="diff-arrow" aria-hidden="true">→</span>
+                <div class="diff-value diff-proposed"><span class="micro-label">PROPOSED VALUE</span><strong id="proposedValue">—</strong></div>
+              </div>
+              <p id="correctionExplanation" class="correction-explanation"></p>
+              <div id="correctionEvidence" class="evidence-quote"></div>
+              <div id="correctionActions" class="decision-actions">
+                <button id="rejectCorrectionButton" class="button button-quiet" type="button">Reject suggestion</button>
+                <button id="approveCorrectionButton" class="button button-primary" type="button">Approve correction</button>
+              </div>
+              <p id="decisionMessage" class="form-message" aria-live="polite"></p>
+            </div>
+          </section>
+
+          <section id="afterSection" class="flow-section comparison-section" aria-labelledby="afterTitle" hidden>
+            <div class="section-label"><span>05</span><span>REPLAY</span></div>
+            <div class="section-heading-row">
+              <div>
+                <h2 id="afterTitle">Same question. New evidence.</h2>
+                <p>Query, expected SKU and ranking settings remain frozen; only the approved catalog version changes.</p>
+              </div>
+              <button id="replayButton" class="button button-secondary" type="button">Replay the same test</button>
+            </div>
+            <div id="comparisonGrid" class="comparison-grid">
+              <div class="comparison-side before-side">
+                <div class="comparison-top"><span>BEFORE</span><span id="beforeMatch">—</span></div>
+                <strong id="compareBeforeSku">—</strong>
+                <p id="compareBeforeTitle">Run the first test to establish a baseline.</p>
+              </div>
+              <div class="comparison-join" aria-hidden="true"><span>ONE<br>APPROVED<br>CHANGE</span></div>
+              <div class="comparison-side after-side">
+                <div class="comparison-top"><span>AFTER</span><span id="afterMatch">NOT RUN</span></div>
+                <strong id="compareAfterSku">—</strong>
+                <p id="compareAfterTitle">The replay will appear here.</p>
+              </div>
+            </div>
+            <p id="replayMessage" class="form-message" aria-live="polite"></p>
+          </section>
+
+          <section id="checkoutSection" class="flow-section checkout-section" aria-labelledby="checkoutTitle" hidden>
+            <div class="section-label"><span>06</span><span>BUYER PROOF</span></div>
+            <div class="section-heading-row">
+              <div>
+                <h2 id="checkoutTitle">Check out the exact corrected variant.</h2>
+                <p>Price and SKU come from the approved catalog snapshot. This PayPal Sandbox order does not reserve or verify live merchant inventory.</p>
+              </div>
+              <span id="paymentState" class="payment-state">NOT STARTED</span>
+            </div>
+            <div class="buyer-sheet">
+              <div class="buyer-item">
+                <span class="micro-label">PRODUCT / VARIANT / SKU</span>
+                <h3 id="buyerProduct">—</h3>
+                <p id="buyerVariant">—</p>
+                <p class="buyer-sku">SKU <strong id="buyerSku">—</strong></p>
+              </div>
+              <div class="buyer-price">
+                <span class="micro-label">CATALOG PRICE</span>
+                <strong id="buyerPrice">—</strong>
+                <label for="quantity">Qty</label>
+                <input id="quantity" type="number" min="1" max="10" value="1" inputmode="numeric" disabled>
+              </div>
+              <div class="buyer-total">
+                <span class="micro-label">SERVER-COMPUTED TOTAL</span>
+                <strong id="buyerTotal">—</strong>
+              </div>
+            </div>
+            <div class="checkout-actions">
+              <button id="createCheckoutButton" class="button button-primary" type="button" disabled>Prepare PayPal checkout <span aria-hidden="true">↗</span></button>
+              <a id="paypalApprovalLink" class="button button-secondary" href="#" target="_blank" rel="noopener noreferrer" hidden>Open PayPal Sandbox approval <span aria-hidden="true">↗</span></a>
+              <button id="verifyPaymentButton" class="button button-secondary" type="button" hidden>Verify approval &amp; complete capture</button>
+              <button id="refreshPaymentButton" class="text-button" type="button" hidden>Refresh PayPal status</button>
+            </div>
+            <div id="paymentResult" class="payment-result" aria-live="polite"></div>
+              <p class="fine-print">The browser redirect is not proof of payment. A completed status appears only after the server reads it back from PayPal. A Sandbox order does not buy from the live store or reserve stock.</p>
+          </section>
+
+          <section id="auditSection" class="flow-section audit-section" aria-labelledby="auditTitle" hidden>
+            <div class="section-label"><span>07</span><span>RECORD</span></div>
+            <div class="section-heading-row">
+              <div>
+                <h2 id="auditTitle">One traceable chain.</h2>
+                <p>AI recommendations, seller choices and PayPal confirmations stay distinct.</p>
+              </div>
+              <button id="refreshAuditButton" class="text-button" type="button">Refresh record</button>
+            </div>
+            <ol id="auditList" class="audit-list"><li class="empty-note">No events for this test yet.</li></ol>
+          </section>
+        </div>
+      </section>
+
+      <footer class="page-footer">
+        <div class="footer-brand"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span><span>CatalogProof</span></div>
+        <p>Evidence before recommendation. Approval before change. PayPal readback before “paid.”</p>
+        <span>DEMO / SANDBOX ONLY</span>
+      </footer>
+    </main>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+</body>
+</html>
