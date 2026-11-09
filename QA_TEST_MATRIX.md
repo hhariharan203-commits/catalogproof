@@ -196,3 +196,15 @@ This section supersedes the earlier intermediate failure counts above; those ent
 
 - After authenticating to the generated Sandbox Business account, a fresh readback showed all three currency-receiving options unselected. The earlier apparent “accept and convert to USD” selection did not persist.
 - No account preference change or order action occurred in this check. Existing order `5E888079UK227011P` remains pending and has no capture. The settings page is being staged again for the owner to save the Sandbox-only choice.
+
+
+## Latest takeover state — Nov 9, 2026, 21:51 IST
+
+- The owner’s current takeover shows “Yes, accept and convert them to USD” selected on `www.sandbox.paypal.com`; the other two options are unselected. This is only a visible selection on the current page, not proof of a saved preference.
+- No settings-save action, fresh-page persistence verification, new order, buyer approval, or capture has occurred from this page yet. A full-page inspection found no Save/Update control for this currency preference; the only visible Save is attached to an unrelated disabled Alternative payment URL field.
+
+
+## Full currency-preference page inspection — Nov 9, 2026, 21:59 IST
+
+- The correct top-of-page row is “Allow payments sent to me in a currency I do not hold.” “Yes, accept and convert them to USD” is selected in the current Sandbox view, but there is no currency-specific submit control or visible auto-save confirmation.
+- The previous authenticated fresh readback showed all three options unselected, so the present selection remains unverified. No setting or order was changed in this inspection; the existing USD 24.00 order remains pending and uncaptured.
