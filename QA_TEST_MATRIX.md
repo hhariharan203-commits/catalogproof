@@ -234,3 +234,10 @@ This section supersedes the earlier intermediate failure counts above; those ent
 - The owner-approved reset completed through the authenticated API. The public synthetic fixture is restored to 2 rows; `CCS-CANVAS-TOTE-ECRU-01` is imported as Stone while its source option remains Ecru.
 - `GET /api/audit?entityType=demo&entityId=workspace` returned 0 events. Reset also cleared local checkout records, corrections, and runs; it did not contact PayPal or cancel the separate pending USD 24.00 Sandbox order.
 - This restored the baseline for the clean-browser AI/query smoke. No PayPal approval or capture was performed.
+
+
+## Public 3002 UI smoke — Nov 9, 2026, 22:31 IST
+
+- Jarvis reports the live NVIDIA workflow passed diagnosis → seller approval → identical-query replay. Before correction, the model selected the intended SKU but diagnosed `conflicting_evidence` on imported Stone versus source Ecru. The correction changed only `variantAttributes.Color`, with the exact “Ecru” source quote; replay returned `supported_match`. This demonstrates conflict resolution, not a wrong-SKU-to-right-SKU flip.
+- No checkout was started. Jarvis reports no app or console errors. PayPal buyer approval/capture/readback and stable judge hosting remain blocked/unverified.
+- UI defects observed: the audit panel showed only `created` after the run/approval, the mismatch note stayed stale after correction, and the correction view hid the field/source-option detail present in the stored record. Fix and rerun before recording or calling the demo polished.
