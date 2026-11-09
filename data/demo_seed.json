@@ -1,0 +1,65 @@
+{
+  "sourceName": "CatalogProof team-authored fictional two-variant fixture",
+  "sourceUrl": "https://example.invalid/catalogproof/team-authored-fixture",
+  "sourceLicense": "Original synthetic data authored for CatalogProof; released under the repository MIT License (see LICENSE).",
+  "isSynthetic": true,
+  "items": [
+    {
+      "productId": "cp-fictional-product-canvas-tote-01",
+      "sku": "CCS-CANVAS-TOTE-ECRU-01",
+      "title": "Fieldwork Cotton Canvas Tote",
+      "description": "Fictional medium cotton-canvas tote with two 22 cm shoulder handles and an interior slip pocket. These specifications are invented for a controlled software test.",
+      "brand": "Cedar Current Studio (fictional)",
+      "variantAttributes": {
+        "Color": "Stone"
+      },
+      "unitAmountMinor": 2400,
+      "currency": "USD",
+      "available": true,
+      "productUrl": "https://example.invalid/catalogproof/products/fieldwork-cotton-canvas-tote",
+      "sourceRecord": {
+        "variantId": "cp-fixture-variant-canvas-tote-001",
+        "sku": "CCS-CANVAS-TOTE-ECRU-01",
+        "selectedOptions": [
+          {
+            "name": "Color",
+            "value": "Ecru"
+          }
+        ],
+        "price": "24.00",
+        "currency": "USD",
+        "availableForSale": true,
+        "sourceReference": "This original CatalogProof team-authored fictional fixture; no external product source.",
+        "fixtureNote": "Controlled synthetic discrepancy: imported Color is Stone while the source option is Ecru."
+      }
+    },
+    {
+      "productId": "cp-fictional-product-canvas-tote-01",
+      "sku": "CCS-CANVAS-TOTE-INK-02",
+      "title": "Fieldwork Cotton Canvas Tote",
+      "description": "Fictional medium cotton-canvas tote with two 22 cm shoulder handles and an interior slip pocket. These specifications are invented for a controlled software test.",
+      "brand": "Cedar Current Studio (fictional)",
+      "variantAttributes": {
+        "Color": "Ink"
+      },
+      "unitAmountMinor": 2400,
+      "currency": "USD",
+      "available": true,
+      "productUrl": "https://example.invalid/catalogproof/products/fieldwork-cotton-canvas-tote",
+      "sourceRecord": {
+        "variantId": "cp-fixture-variant-canvas-tote-002",
+        "sku": "CCS-CANVAS-TOTE-INK-02",
+        "selectedOptions": [
+          {
+            "name": "Color",
+            "value": "Ink"
+          }
+        ],
+        "price": "24.00",
+        "currency": "USD",
+        "availableForSale": true,
+        "sourceReference": "This original CatalogProof team-authored fictional fixture; no external product source."
+      }
+    }
+  ]
+}
