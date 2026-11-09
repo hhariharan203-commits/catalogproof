@@ -56,7 +56,7 @@ The current suite covers diagnostic schema/citations and hard constraints, auth/
 
 ## Demo reset
 
-Use **Reset demo** in the app, or call `POST /api/demo/reset` with the authenticated session and CSRF token. Reset deletes run/correction/payment/audit state and reloads the team-authored synthetic fixture. It never contacts PayPal or creates a new payment.
+Use **Reset demo** in the app, or call `POST /api/demo/reset` with the authenticated session and CSRF token. Reset deletes the app’s local query tests/runs, corrections, checkout/payment records, and audit history, then reloads the team-authored synthetic fixture. It never contacts PayPal, creates or cancels a Sandbox order, or marks anything paid; a pending PayPal Sandbox order can remain at PayPal after its local record is cleared.
 
 ## Project shape
 
@@ -73,7 +73,7 @@ Use **Reset demo** in the app, or call `POST /api/demo/reset` with the authentic
 
 ## Scope and limitations
 
-This is a hackathon demo, not production-ready multi-tenant software. The app uses one demo merchant login and one SQLite database. Live NVIDIA inference has been exercised against the synthetic fixture; no real catalog defect or merchant outcome is claimed. A USD 24.00 PayPal Sandbox order was created, but buyer approval remains pending. The Sandbox page currently shows the currency-conversion preference selected, while a fresh readback did not confirm it persisted; no capture or paid readback is verified. Port 3002 is a temporary preview, not stable judge hosting, and the public video and Devpost submission are still pending.
+This is a hackathon demo, not production-ready multi-tenant software. The app uses one demo merchant login and one SQLite database. Live NVIDIA inference has been exercised against the synthetic fixture; no real catalog defect or merchant outcome is claimed. A USD 24.00 PayPal Sandbox order was created, but buyer approval remains pending. The Sandbox seller’s currency-conversion preference still fails fresh-page readback; no capture or paid readback is verified. Port 3002 is a temporary preview, not stable judge hosting, and the public video and Devpost submission are still pending.
 
 
 ## Synthetic demo walkthrough

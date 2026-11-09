@@ -20,7 +20,7 @@ NVIDIA hosted NIM diagnoses a bounded set of catalog variants against the frozen
 
 The app implements PayPal Orders v2 in Sandbox only. The backend creates an order from the frozen, approved SKU snapshot, reads the order back, requires buyer approval before capture, and verifies completed capture details against the saved SKU, quantity, amount, and currency before showing paid.
 
-Release disclosure: USD 24.00 Sandbox orders were created, but PayPal blocked buyer approval because the seller’s receiving preference still isn’t confirmed saved. The latest order remains `PAYER_ACTION_REQUIRED`; no buyer approval, capture, or authoritative paid readback has occurred. Unit and route tests use mocked PayPal responses and are not transaction proof. Update this wording only after the full Sandbox flow succeeds and is documented.
+Release disclosure: A USD 24.00 Sandbox order remains `PAYER_ACTION_REQUIRED`. The seller’s receiving preference showed “Saved!” but an authenticated fresh readback showed all three options blank; no buyer approval, capture, or authoritative paid readback has occurred. The owner-approved synthetic baseline reset cleared the app’s local checkout record, but did not cancel the separate pending PayPal order, so it is no longer linked in the current app state. Unit and route tests use mocked PayPal responses and are not transaction proof.
 
 ## Demo sequence
 
@@ -34,9 +34,10 @@ Release disclosure: USD 24.00 Sandbox orders were created, but PayPal blocked bu
 
 ## Verified checks as of Nov 9, 2026
 
-- `npm test`: 57 passed, 0 failed, 2 opt-in live-AI tests skipped.
-- `npm run test:live`: 59 passed, 0 failed, including live NVIDIA inference and synthetic before/after correction replay.
-- The exact shopper query also passed once through the authenticated app route with live NVIDIA inference and a source-resolved correction draft.
+- `npm test`: 65 passed, 0 failed, 2 opt-in live-AI tests skipped.
+- `npm run test:live`: 67 passed, 0 failed, 0 skipped, including live NVIDIA inference and synthetic before/after replay.
+- Public 3002 smoke passed live diagnosis → seller-approved correction → identical-query replay. The model selected the intended SKU both before and after; it diagnosed `conflicting_evidence` on Stone versus source Ecru, and replay returned `supported_match`. This is a conflict-resolution demo, not a wrong-SKU-to-right-SKU flip.
+- The audit view showed six events after the UI/API fix, and the correction panel displayed the field path and exact source quote. No checkout was started in this smoke.
 - PayPal adapter and route regressions cover Sandbox-only hosts, exact order snapshots, idempotency reuse, completed-order reconciliation, and capture-mismatch rejection with mocked provider responses.
 - Desktop/mobile visual QA reported zero axe violations at 1440px and 390px, and no horizontal overflow at 320px, 390px, or 1440px. This is UI QA, not PayPal or deployment proof.
 
@@ -46,7 +47,7 @@ Release disclosure: USD 24.00 Sandbox orders were created, but PayPal blocked bu
 - A stable public HTTPS deployment and clean-browser end-to-end check. Current port-3002 preview is temporary and should not be presented as stable judge hosting.
 - Public video under 3 minutes, recorded from the actual successful flow and checked at its published URL.
 - Final Devpost fields and links; no submission has been made.
-- Verify that the cleaned local source and QA matrix are pushed to the public repository after the approved history rewrite.
+- Push the current UI/API/test/documentation changes and recheck the public repository head before submission.
 
 ## Links
 

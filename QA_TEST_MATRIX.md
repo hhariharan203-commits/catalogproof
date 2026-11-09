@@ -241,3 +241,10 @@ This section supersedes the earlier intermediate failure counts above; those ent
 - Jarvis reports the live NVIDIA workflow passed diagnosis → seller approval → identical-query replay. Before correction, the model selected the intended SKU but diagnosed `conflicting_evidence` on imported Stone versus source Ecru. The correction changed only `variantAttributes.Color`, with the exact “Ecru” source quote; replay returned `supported_match`. This demonstrates conflict resolution, not a wrong-SKU-to-right-SKU flip.
 - No checkout was started. Jarvis reports no app or console errors. PayPal buyer approval/capture/readback and stable judge hosting remain blocked/unverified.
 - UI defects observed: the audit panel showed only `created` after the run/approval, the mismatch note stayed stale after correction, and the correction view hid the field/source-option detail present in the stored record. Fix and rerun before recording or calling the demo polished.
+
+
+## Independent audit/UI regression review — Nov 9, 2026, 23:03 IST
+
+- Captain’s independent review found no mismatch in the audit-view API: query-test views include linked run/correction events, while direct run/correction filters remain exact. The route regression covers created → before run → correction proposed/approved → after replay and verifies `supported_match`.
+- Focused audit-route/UI tests passed 8/8. Sequential current-build runs: `npm test` — 65 passed, 0 failed, 2 opt-in live-AI skips; `npm run test:live` — 67 passed, 0 failed, 0 skipped, including live NVIDIA inference. Neither suite called PayPal or approved/captured the pending order.
+- Remaining release blockers are the Sandbox currency-preference persistence / buyer approval and stable judge hosting. The pending USD 24.00 Sandbox order remains uncaptured.
