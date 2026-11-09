@@ -1,7 +1,11 @@
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
 
-const ENV_KEYS = ['AI_BASE_URL', 'AI_API_KEY', 'AI_MODEL'];
+const ENV_KEYS = [
+  'AI_BASE_URL', 'AI_API_KEY', 'AI_MODEL',
+  'AI_REQUEST_TIMEOUT_MS', 'AI_NVIDIA_ENABLE_THINKING',
+];
+const REQUIRED_AI_ENV_KEYS = ['AI_BASE_URL', 'AI_API_KEY', 'AI_MODEL'];
 const originalEnv = Object.fromEntries(ENV_KEYS.map((key) => [key, process.env[key]]));
 const originalFetch = globalThis.fetch;
 
@@ -141,7 +145,7 @@ test('model request is server-side, candidate-limited, JSON-constrained and vali
   const { diagnose } = await loadDiagnostics();
   const calls = [];
   await withRuntime({
-    env: aiEnv('request-shape'),
+    env: { ...aiEnv('request-shape'), AI_REQUEST_TIMEOUT_MS: '90000', AI_NVIDIA_ENABLE_THINKING: 'false' },
     fetchImpl: async (url, options) => {
       calls.push({ url: new URL(url), options });
       return modelResponse(supportedMatch());
@@ -156,11 +160,14 @@ test('model request is server-side, candidate-limited, JSON-constrained and vali
       assert.equal(calls[0].url.href, 'https://integrate.api.nvidia.com/v1/chat/completions');
       assert.equal(calls[0].options.method, 'POST');
       assert.equal(calls[0].options.redirect, 'error');
+      assert.ok(calls[0].options.signal instanceof AbortSignal);
       assert.equal(calls[0].options.headers.Authorization, `Bearer ${aiEnv('request-shape').AI_API_KEY}`);
       const body = JSON.parse(calls[0].options.body);
       assert.equal(body.model, 'fixture-model');
       assert.equal(body.temperature, 0);
+      assert.equal(body.max_tokens, 1600);
       assert.deepEqual(body.response_format, { type: 'json_object' });
+      assert.deepEqual(body.chat_template_kwargs, { enable_thinking: false });
       assert.equal(body.stream, false);
       assert.equal(body.messages.length, 2);
       const payload = JSON.parse(body.messages[1].content);
@@ -172,6 +179,107 @@ test('model request is server-side, candidate-limited, JSON-constrained and vali
       assert.equal(JSON.stringify(payload).includes(aiEnv('request-shape').AI_API_KEY), false);
     },
   });
+});
+
+test('NVIDIA thinking override accepts both boolean values and non-NVIDIA hosts omit it', async (t) => {
+  const { diagnose } = await loadDiagnostics();
+  for (const value of ['true', 'false']) {
+    await t.test(`NVIDIA enable_thinking=${value}`, async () => {
+      let body;
+      await withRuntime({
+        env: { ...aiEnv(`thinking-${value}`), AI_NVIDIA_ENABLE_THINKING: value },
+        fetchImpl: async (_url, options) => {
+          body = JSON.parse(options.body);
+          return modelResponse(supportedMatch());
+        },
+        run: async () => {
+          await diagnose(input());
+          assert.deepEqual(body.chat_template_kwargs, { enable_thinking: value === 'true' });
+        },
+      });
+    });
+  }
+  await t.test('generic host omits NVIDIA-specific option', async () => {
+    let body;
+    await withRuntime({
+      env: {
+        ...aiEnv('generic-host'),
+        AI_BASE_URL: 'https://ai.example.test/v1',
+        AI_NVIDIA_ENABLE_THINKING: 'not-a-boolean',
+      },
+      fetchImpl: async (_url, options) => {
+        body = JSON.parse(options.body);
+        return modelResponse(supportedMatch());
+      },
+      run: async () => {
+        await diagnose(input());
+        assert.equal(Object.hasOwn(body, 'chat_template_kwargs'), false);
+      },
+    });
+  });
+});
+
+test('invalid optional AI settings fail closed before network access', async (t) => {
+  const { diagnose } = await loadDiagnostics();
+  const cases = [
+    { name: 'timeout below minimum', env: { AI_REQUEST_TIMEOUT_MS: '999' } },
+    { name: 'timeout above maximum', env: { AI_REQUEST_TIMEOUT_MS: '120001' } },
+    { name: 'noninteger timeout', env: { AI_REQUEST_TIMEOUT_MS: '1.5' } },
+    { name: 'invalid NVIDIA boolean', env: { AI_NVIDIA_ENABLE_THINKING: 'sometimes' } },
+  ];
+  for (const item of cases) {
+    await t.test(item.name, async () => {
+      let calls = 0;
+      await withRuntime({
+        env: { ...aiEnv(item.name), ...item.env },
+        fetchImpl: async () => { calls += 1; throw new Error('unexpected network call'); },
+        run: async () => {
+          await assert.rejects(diagnose(input()), (error) => {
+            assert.equal(error.code, 'AI_UNAVAILABLE');
+            assert.equal(error.status, 503);
+            assert.equal(String(error).includes(aiEnv(item.name).AI_API_KEY), false);
+            return true;
+          });
+          assert.equal(calls, 0);
+        },
+      });
+    });
+  }
+});
+
+test('default request timeout remains 20 seconds and rejected fetch errors do not leak secrets', async () => {
+  const { diagnose } = await loadDiagnostics();
+  const observedTimeouts = [];
+  const originalTimeout = AbortSignal.timeout;
+  AbortSignal.timeout = (milliseconds) => {
+    observedTimeouts.push(milliseconds);
+    return originalTimeout.call(AbortSignal, milliseconds);
+  };
+  try {
+    const secret = aiEnv('fetch-abort').AI_API_KEY;
+    await withRuntime({
+      env: aiEnv('fetch-abort'),
+      fetchImpl: async () => { throw new Error(`aborted request with ${secret}`); },
+      run: async () => {
+        await assert.rejects(diagnose(input()), (error) => {
+          assert.equal(error.code, 'AI_UNAVAILABLE');
+          assert.equal(error.status, 503);
+          assert.equal(String(error).includes(secret), false);
+          return true;
+        });
+      },
+    });
+    await withRuntime({
+      env: { ...aiEnv('configured-timeout'), AI_REQUEST_TIMEOUT_MS: '90000' },
+      fetchImpl: async () => modelResponse(supportedMatch()),
+      run: async () => {
+        await diagnose(input());
+        assert.deepEqual(observedTimeouts, [20_000, 90_000]);
+      },
+    });
+  } finally {
+    AbortSignal.timeout = originalTimeout;
+  }
 });
 
 test('hard variant constraints reject a model-selected nonmatching candidate', async () => {
@@ -498,8 +606,8 @@ test('provider failures, invalid JSON and unsafe base URLs are reported safely',
   });
 });
 
-const liveInferenceConfigured = ENV_KEYS.every((key) => process.env[key]?.trim());
-test('live AI inference smoke (not mocked)', { skip: liveInferenceConfigured ? false : 'AI_BASE_URL, AI_API_KEY and AI_MODEL are not configured in this environment.' }, async () => {
+const liveInferenceConfigured = REQUIRED_AI_ENV_KEYS.every((key) => process.env[key]?.trim());
+test('live AI inference smoke (not mocked)', { timeout: 110_000, skip: liveInferenceConfigured ? false : 'AI_BASE_URL, AI_API_KEY and AI_MODEL are not configured in this environment.' }, async () => {
   const { diagnose } = await loadDiagnostics();
   const result = await diagnose(input());
   assert.ok(['supported_match', 'conflicting_evidence', 'insufficient_evidence', 'ambiguous'].includes(result.outcome));

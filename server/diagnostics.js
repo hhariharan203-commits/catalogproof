@@ -22,6 +22,8 @@ const MAX_MODEL_CANDIDATES = 12;
 const MAX_REQUEST_BYTES = 160_000;
 const MAX_RESPONSE_BYTES = 1_000_000;
 const REQUEST_TIMEOUT_MS = 20_000;
+const MIN_REQUEST_TIMEOUT_MS = 1_000;
+const MAX_REQUEST_TIMEOUT_MS = 120_000;
 const STOP_WORDS = new Set([
   'a', 'an', 'and', 'are', 'as', 'at', 'be', 'by', 'for', 'from', 'i', 'in',
   'is', 'it', 'me', 'my', 'of', 'on', 'or', 'please', 'the', 'to', 'with',
@@ -524,26 +526,54 @@ async function callModel(messages) {
     throw codedError('AI_UNAVAILABLE', 'AI inference is not configured.');
   }
 
+  const timeoutValue = process.env.AI_REQUEST_TIMEOUT_MS?.trim();
+  let timeoutMs = REQUEST_TIMEOUT_MS;
+  if (timeoutValue !== undefined) {
+    if (!/^\d+$/.test(timeoutValue)) {
+      throw codedError('AI_UNAVAILABLE', 'AI request timeout configuration is invalid.');
+    }
+    timeoutMs = Number(timeoutValue);
+    if (!Number.isSafeInteger(timeoutMs)
+        || timeoutMs < MIN_REQUEST_TIMEOUT_MS || timeoutMs > MAX_REQUEST_TIMEOUT_MS) {
+      throw codedError('AI_UNAVAILABLE', 'AI request timeout configuration is invalid.');
+    }
+  }
+
   const endpoint = chatCompletionsUrl(baseUrl);
+  const nvidiaHosted = new URL(endpoint).hostname === 'integrate.api.nvidia.com';
+  let enableThinking;
+  if (nvidiaHosted && process.env.AI_NVIDIA_ENABLE_THINKING !== undefined) {
+    const thinkingValue = process.env.AI_NVIDIA_ENABLE_THINKING.trim().toLowerCase();
+    if (thinkingValue !== 'true' && thinkingValue !== 'false') {
+      throw codedError('AI_UNAVAILABLE', 'NVIDIA thinking configuration is invalid.');
+    }
+    enableThinking = thinkingValue === 'true';
+  }
+
+  const requestBody = {
+    model,
+    messages,
+    temperature: 0,
+    max_tokens: 1600,
+    response_format: { type: 'json_object' },
+    stream: false,
+  };
+  if (nvidiaHosted && enableThinking !== undefined) {
+    requestBody.chat_template_kwargs = { enable_thinking: enableThinking };
+  }
+
   let response;
   try {
     response = await fetch(endpoint, {
       method: 'POST',
       redirect: 'error',
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      signal: AbortSignal.timeout(timeoutMs),
       headers: {
         Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
         Accept: 'application/json',
       },
-      body: JSON.stringify({
-        model,
-        messages,
-        temperature: 0,
-        max_tokens: 1600,
-        response_format: { type: 'json_object' },
-        stream: false,
-      }),
+      body: JSON.stringify(requestBody),
     });
   } catch {
     throw codedError('AI_UNAVAILABLE', 'AI provider could not be reached.');
