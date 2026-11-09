@@ -164,3 +164,10 @@ This section supersedes the earlier intermediate failure counts above; those ent
 
 - The first approval attempt was stopped before credentials or payment when the browser redirected to the Live PayPal sign-in host. No order or capture IDs exist from that attempt.
 - A later team update reports that the Developer Dashboard Sandbox account list is accessible again and the generated Personal test buyer is being checked. No order creation, buyer approval, capture, or PayPal readback has been reported yet; keep the P0 PayPal gate NOT RUN until completed end to end.
+
+
+## Sandbox order attempt — Nov 9, 2026, 21:08 IST
+
+- A generated Sandbox Personal buyer signed in successfully. PayPal created order `3UY58652F7591683J` for USD 24.00; checkout ID `3c675fb8-276b-4bef-8637-d7929b71d7c5`.
+- The Sandbox seller rejected buyer approval with “This seller doesn’t accept payments in your currency.” PayPal order readback remains `PAYER_ACTION_REQUIRED`, app state `approval_pending`, and `verifiedPaid:false`.
+- No approval, capture, or paid event occurred. Doom is changing only the Sandbox seller test account to accept/hold USD and will retry approval for this order first. Do not report a successful payment unless PayPal later confirms a matching `COMPLETED` capture.
