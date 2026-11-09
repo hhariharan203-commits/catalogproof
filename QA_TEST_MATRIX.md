@@ -208,3 +208,9 @@ This section supersedes the earlier intermediate failure counts above; those ent
 
 - The correct top-of-page row is “Allow payments sent to me in a currency I do not hold.” “Yes, accept and convert them to USD” is selected in the current Sandbox view, but there is no currency-specific submit control or visible auto-save confirmation.
 - The previous authenticated fresh readback showed all three options unselected, so the present selection remains unverified. No setting or order was changed in this inspection; the existing USD 24.00 order remains pending and uncaptured.
+
+
+## Post-login-rotation test rerun — Nov 9, 2026, 21:36 IST
+
+- Standard suite after the demo password rotation: `npm test` — 57 passed, 0 failed, 2 live-inference tests skipped.
+- Opt-in live suite: `npm run test:live` — 59 passed, 0 failed, 0 skipped, including real NVIDIA synthetic-fixture inference and before/after replay. No PayPal API call or order action was made by either suite.
