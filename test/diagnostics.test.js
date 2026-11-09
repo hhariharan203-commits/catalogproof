@@ -15,7 +15,7 @@ after(() => {
 
 function aiEnv(suffix = 'test') {
   return {
-    AI_BASE_URL: 'https://ai.example.test/v1',
+    AI_BASE_URL: 'https://integrate.api.nvidia.com/v1',
     AI_API_KEY: `private-test-key-${suffix}`,
     AI_MODEL: 'fixture-model',
   };
@@ -153,7 +153,7 @@ test('model request is server-side, candidate-limited, JSON-constrained and vali
       assert.equal(result.matchedFacts.length, 2);
       assert.deepEqual(result.issues, []);
       assert.equal(calls.length, 1);
-      assert.equal(calls[0].url.href, 'https://ai.example.test/v1/chat/completions');
+      assert.equal(calls[0].url.href, 'https://integrate.api.nvidia.com/v1/chat/completions');
       assert.equal(calls[0].options.method, 'POST');
       assert.equal(calls[0].options.redirect, 'error');
       assert.equal(calls[0].options.headers.Authorization, `Bearer ${aiEnv('request-shape').AI_API_KEY}`);

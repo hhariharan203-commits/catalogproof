@@ -55,7 +55,7 @@ test('actual routes compose import → AI diagnosis → seller approval → repl
   Object.assign(process.env, {
     PORT: String(port), DATABASE_PATH: ':memory:', DEMO_PASSWORD: password,
     SESSION_SECRET: sessionSecret, NODE_ENV: 'test', PUBLIC_BASE_URL: `https://127.0.0.1:${port}`,
-    AI_BASE_URL: 'https://api.openai.com/v1', AI_API_KEY: 'fake-integration-key', AI_MODEL: 'integration-test-model',
+    AI_BASE_URL: 'https://ai.example.test/v1', AI_API_KEY: 'fake-integration-key', AI_MODEL: 'integration-test-model',
     PAYPAL_CLIENT_ID: 'fake-client-id', PAYPAL_CLIENT_SECRET: 'fake-client-secret',
     PAYPAL_API_BASE: 'https://api-m.sandbox.paypal.com',
   });
@@ -63,7 +63,7 @@ test('actual routes compose import → AI diagnosis → seller approval → repl
   globalThis.fetch = async (input, init = {}) => {
     const target = typeof input === 'string' ? input : input.url;
     if (target.startsWith(base)) return originalFetch(input, init);
-    if (target === 'https://api.openai.com/v1/chat/completions') {
+    if (target === 'https://ai.example.test/v1/chat/completions') {
       const payload = JSON.parse(init.body);
       return response({ choices: [{ message: { content: JSON.stringify(modelAnswer(payload)) } }] });
     }
