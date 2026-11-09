@@ -220,3 +220,10 @@ This section supersedes the earlier intermediate failure counts above; those ent
 
 - Read-only comparison confirms the generated Sandbox Business seller being viewed matches the payee on the pending order. Editing the wrong test seller is not the cause indicated by this check.
 - The pending order remains `PAYER_ACTION_REQUIRED`; no preference or order state was changed, and there is no capture. Currency-preference persistence is still unverified.
+
+
+## Authorized receiving-preference toggle test — Nov 9, 2026, 22:20 IST
+
+- Per the owner’s approval, the matching Sandbox seller’s currency preference was briefly changed to “No, deny the payments,” then restored to “Yes, accept and convert them to USD.” The page displayed “Saved!” after the restore.
+- An authenticated fresh-page readback still showed all three currency options unselected. No other preference changed, and no order was created, retried, approved, or captured. The existing USD 24.00 checkout remains pending and unpaid.
+- Treat the PayPal approval/capture/readback gate as blocked; do not retry further setting toggles unless a supported save path is found or the owner approves a new test plan.
