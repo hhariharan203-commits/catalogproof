@@ -63,7 +63,7 @@ The observed run selected the intended SKU both before and after the correction:
 
 ## Before you submit
 
-1. Publish the current local server/test hardening and final documentation, then verify the public repository shows the intended revision. The public repository currently points to `5db70de`; the latest local changes are not pushed.
+1. The final reviewed server/test hardening and submission documentation are published at commit `dc328f81a033f0b204a113d884fa638115559db3`. Check the public repository shows that revision before entering the Devpost link.
 2. Review and approve the local 1:49 narrated/captioned draft, then upload it to public YouTube, check the published page, and add the verified video URL. Keep synthetic-data and PayPal Sandbox labels visible, do not show credentials or personal buyer details, and do not imply a wrong-SKU flip or merchant outcome.
 3. Use the repository’s complete local setup/run instructions for judge access if no durable host is arranged. The preview is temporary and login-protected; do not place the private demo password in public copy.
 4. Add the verified video link and any durable demo link, fill the event-specific Devpost fields, and submit manually. No Devpost submission has been made.
