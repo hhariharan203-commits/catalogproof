@@ -171,3 +171,16 @@ This section supersedes the earlier intermediate failure counts above; those ent
 - A generated Sandbox Personal buyer signed in successfully. PayPal created order `3UY58652F7591683J` for USD 24.00; checkout ID `3c675fb8-276b-4bef-8637-d7929b71d7c5`.
 - The Sandbox seller rejected buyer approval with “This seller doesn’t accept payments in your currency.” PayPal order readback remains `PAYER_ACTION_REQUIRED`, app state `approval_pending`, and `verifiedPaid:false`.
 - No approval, capture, or paid event occurred. Doom is changing only the Sandbox seller test account to accept/hold USD and will retry approval for this order first. Do not report a successful payment unless PayPal later confirms a matching `COMPLETED` capture.
+
+
+## Current Sandbox retry — Nov 9, 2026, 21:23 IST
+
+- Latest checkout `32a9db15-989d-46d4-99d8-1e0fe63a4197` targets the same frozen tote SKU, quantity 1, and USD 24.00. PayPal order `5E888079UK227011P` still reads `PAYER_ACTION_REQUIRED`; app state is `approval_pending`, and no capture ID exists.
+- The Sandbox seller’s receiving preference appeared as “Yes, accept and convert them to USD” in one view, but a fresh-page check could not confirm it saved. A Sandbox-only manual check was sent to the owner; no Live settings or real payment were touched.
+- The next attempt must use the same pending order after the preference is saved. Do not create further orders or mark this checkout paid without a verified `COMPLETED` capture and exact readback.
+
+
+## Existing order follow-up — Nov 9, 2026, 21:30 IST
+
+- Confirmed current checkout `32a9db15-989d-46d4-99d8-1e0fe63a4197` for SKU `CCS-CANVAS-TOTE-ECRU-01`, quantity 1, USD 24.00 remains `PAYER_ACTION_REQUIRED` / `approval_pending`; `captureStatus` and capture ID are null, and `verifiedPaid:false`.
+- No additional order was created and no seller preference change was confirmed saved. Buyer approval remains blocked by PayPal’s currency-receiving message; do not mark the purchase paid.

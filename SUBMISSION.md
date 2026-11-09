@@ -20,7 +20,7 @@ NVIDIA hosted NIM diagnoses a bounded set of catalog variants against the frozen
 
 The app implements PayPal Orders v2 in Sandbox only. The backend creates an order from the frozen, approved SKU snapshot, reads the order back, requires buyer approval before capture, and verifies completed capture details against the saved SKU, quantity, amount, and currency before showing paid.
 
-Release disclosure: a USD 24.00 Sandbox order was created, but PayPal blocked buyer approval because the Sandbox seller does not accept USD. The order remains `PAYER_ACTION_REQUIRED`; no buyer approval, capture, or authoritative paid readback has occurred. Unit and route tests use mocked PayPal responses and are not transaction proof. Update this wording only after the full Sandbox flow succeeds and is documented.
+Release disclosure: USD 24.00 Sandbox orders were created, but PayPal blocked buyer approval because the seller’s receiving preference still isn’t confirmed saved. The latest order remains `PAYER_ACTION_REQUIRED`; no buyer approval, capture, or authoritative paid readback has occurred. Unit and route tests use mocked PayPal responses and are not transaction proof. Update this wording only after the full Sandbox flow succeeds and is documented.
 
 ## Demo sequence
 
