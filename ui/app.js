@@ -181,7 +181,7 @@
   }
 
   async function resetDemo() {
-    const confirmed = window.confirm('Reset the shared demo workspace? This restores the team-authored synthetic two-variant fixture and clears demo event history. Uploaded data in this demo workspace will be removed.');
+    const confirmed = window.confirm('Reset the shared demo workspace? This restores the team-authored synthetic two-variant fixture and deletes local query tests and runs, corrections, checkout/payment records, and audit history. Uploaded data in this demo workspace will be removed. This does NOT cancel any PayPal Sandbox order.');
     if (!confirmed) return;
     setBusy($('resetButton'), true, 'Resetting…');
     try {
@@ -304,14 +304,33 @@
 
   function syntheticScenario(version) {
     const name = version?.sourceName || '';
-    if (name === 'CatalogProof team-authored fictional two-variant fixture') {
-      return {
-        sku: 'CCS-CANVAS-TOTE-ECRU-01',
-        query: 'Find the Ecru Fieldwork Cotton Canvas Tote.',
-        note: 'Controlled synthetic discrepancy: the imported variant says Stone; its source record says Ecru.'
-      };
-    }
-    return null;
+    if (!version?.isSynthetic || name !== 'CatalogProof team-authored fictional two-variant fixture') return null;
+    const sku = 'CCS-CANVAS-TOTE-ECRU-01';
+    const item = findItem(sku);
+    const sourceOptions = Array.isArray(item?.sourceRecord?.selectedOptions) ? item.sourceRecord.selectedOptions : [];
+    const optionDetails = sourceOptions
+      .map((option, index) => ({ option, index }))
+      .filter(({ option }) => option && typeof option.name === 'string' && option.value !== undefined)
+      .map(({ option, index }) => {
+        const attrs = itemAttrs(item);
+        const fieldPath = `variantAttributes.${option.name}`;
+        const namePath = `sourceRecord.selectedOptions.${index}.name`;
+        const valuePath = `sourceRecord.selectedOptions.${index}.value`;
+        const hasCurrentValue = Object.prototype.hasOwnProperty.call(attrs, option.name);
+        const currentValue = hasCurrentValue ? attrs[option.name] : undefined;
+        const comparison = hasCurrentValue && Object.is(currentValue, option.value) ? 'values match.' : 'values differ.';
+        return `Current version ${fieldPath}: ${formatValue(currentValue)}; ${namePath}: ${formatValue(option.name)}; ${valuePath}: ${formatValue(option.value)}; ${comparison}`;
+      });
+    const note = !item
+      ? `Current version data for ${sku} is not loaded.`
+      : optionDetails.length
+        ? optionDetails.join(' ')
+        : `No selectedOptions entries are stored for ${sku} in the current version.`;
+    return {
+      sku,
+      query: 'Find the Ecru Fieldwork Cotton Canvas Tote.',
+      note
+    };
   }
 
   function renderCatalog() {
@@ -564,8 +583,8 @@
     state.test = data.test || state.test;
     lockFrozenInputs(state.test);
     const runs = Array.isArray(data.runs) ? data.runs : [];
-    state.beforeRun = runs.find((run) => run.phase === 'before') || state.beforeRun;
-    state.afterRun = runs.find((run) => run.phase === 'after') || state.afterRun;
+    state.beforeRun = runs.filter((run) => run.phase === 'before').at(-1) || state.beforeRun;
+    state.afterRun = runs.filter((run) => run.phase === 'after').at(-1) || state.afterRun;
     const corrections = Array.isArray(data.corrections) ? data.corrections : [];
     state.correction = corrections[corrections.length - 1] || state.correction;
     if (!state.beforeItemSnapshot && sameVersionAsCatalog(state.beforeRun)) state.beforeItemSnapshot = snapshotRunItem(state.beforeRun);
@@ -748,13 +767,14 @@
     const approved = status === 'approved';
     const rejected = status === 'rejected';
     const pending = status === 'pending';
+    $('correctionFieldPath').textContent = correction?.fieldPath || draft?.fieldPath || 'Not provided';
 
     if (correction) {
       $('originalValue').textContent = formatValue(parseMaybeJSON(correction.originalValue ?? correction.originalValueJson ?? correction.original_value_json));
       $('proposedValue').textContent = formatValue(parseMaybeJSON(correction.proposedValue ?? correction.proposedValueJson ?? correction.proposed_value_json));
       $('correctionExplanation').textContent = correction.explanation || '';
       const evidence = parseMaybeJSON(correction.evidence ?? correction.evidenceJson ?? correction.evidence_json);
-      renderEvidence(evidence);
+      renderEvidence(evidence, correction.sku, correction.fieldPath);
       $('correctionStatus').textContent = approved ? 'APPROVED' : rejected ? 'REJECTED' : 'PENDING REVIEW';
       $('correctionStatus').dataset.tone = approved ? 'success' : rejected ? 'error' : 'warning';
       $('correctionActions').hidden = !pending;
@@ -771,7 +791,7 @@
     $('originalValue').textContent = formatValue(getItemField(sourceItem, draft.fieldPath));
     $('proposedValue').textContent = formatValue(draft.proposedValue);
     $('correctionExplanation').textContent = draft.explanation || 'Review the cited evidence before deciding whether to submit this correction.';
-    renderEvidence(draft.evidence);
+    renderEvidence(draft.evidence, draft.sku, draft.fieldPath);
     $('correctionStatus').textContent = 'AI SUGGESTION';
     $('correctionStatus').dataset.tone = 'warning';
     $('correctionActions').hidden = false;
@@ -782,31 +802,70 @@
     setMessage($('decisionMessage'), 'No catalog data has changed. Submit the cited suggestion for an explicit seller decision.');
   }
 
-  function renderEvidence(evidence) {
+  function renderEvidence(evidence, sku = '', fieldPath = '') {
     const host = $('correctionEvidence');
+    const optionsHost = $('correctionSourceOptions');
     host.replaceChildren();
+    optionsHost.replaceChildren();
+    optionsHost.hidden = true;
     const citation = Array.isArray(evidence) ? evidence[0] : evidence;
     if (!citation || typeof citation !== 'object') {
-      const heading = document.createElement('strong');
-      heading.textContent = 'SOURCE EVIDENCE';
       const text = document.createElement('span');
-      text.textContent = 'No source citation was returned. This correction cannot be approved as evidence-backed.';
-      host.append(heading, text);
+      text.textContent = 'No exact quote provided. This correction cannot be approved as evidence-backed.';
+      host.append(text);
       $('approveCorrectionButton').disabled = true;
       return;
     }
-    $('approveCorrectionButton').disabled = false;
+    const exactQuote = citation.exactQuote ?? citation.exact_quote;
+    const hasExactQuote = typeof exactQuote === 'string' && exactQuote.trim().length > 0;
+    $('approveCorrectionButton').disabled = !hasExactQuote;
+    const recordId = citation.recordId || citation.record_id || '';
     const heading = document.createElement('strong');
-    heading.textContent = `${citation.sourceType || citation.source_type || 'CATALOG SOURCE'}${citation.recordId || citation.record_id ? ` · RECORD ${citation.recordId || citation.record_id}` : ''}`;
+    heading.textContent = `${citation.sourceType || citation.source_type || 'Source type not provided'}${recordId ? ` · RECORD ${recordId}` : ''}`;
     const text = document.createElement('span');
-    text.textContent = citation.exactQuote || citation.exact_quote || `${citation.fieldPath || citation.field_path || 'Field'}: ${formatValue(citation.value)}`;
+    text.textContent = hasExactQuote ? exactQuote : 'No exact quote provided.';
     host.append(heading, text);
+    const sourceReference = citation.sourceReference || citation.source_reference;
+    if (sourceReference) {
+      const reference = document.createElement('span');
+      reference.textContent = `sourceReference: ${sourceReference}`;
+      host.append(reference);
+    }
+    const sourceItem = findItem(sku);
+    const sourceOptions = sourceItem?.sourceRecord?.selectedOptions;
+    if (!Array.isArray(sourceOptions)) return;
+    const matchingOptions = sourceOptions.map((option, index) => ({ option, index }))
+      .filter(({ option }) => option && typeof option.name === 'string' && option.value !== undefined && fieldPath === `variantAttributes.${option.name}`);
+    if (!matchingOptions.length) return;
+    const currentRecordId = sourceItem.id || sourceItem.recordId || '';
+    const currentVersion = state.catalog?.currentVersion;
+    const currentVersionId = (typeof currentVersion === 'object' ? currentVersion?.id : currentVersion) || '';
+    const currentReference = currentVersionId ? `catalog://${encodeURIComponent(currentVersionId)}/sku/${encodeURIComponent(sku)}` : '';
+    const citedRecordLoaded = Boolean(recordId && currentRecordId === recordId && currentReference && sourceReference === currentReference);
+    const sourceHeading = document.createElement('strong');
+    sourceHeading.textContent = citedRecordLoaded ? 'CITED RECORD SOURCE OPTIONS' : 'CURRENT CATALOG SOURCE OPTIONS';
+    optionsHost.append(sourceHeading);
+    if (!citedRecordLoaded) {
+      const note = document.createElement('span');
+      note.textContent = 'The cited historical record is not loaded. These current-version values are not additional citation evidence.';
+      optionsHost.append(note);
+    }
+    const identity = document.createElement('span');
+    identity.textContent = [currentVersionId && `catalogVersionId: ${currentVersionId}`, currentRecordId && `recordId: ${currentRecordId}`].filter(Boolean).join(' · ');
+    if (identity.textContent) optionsHost.append(identity);
+    matchingOptions.forEach(({ option, index }) => {
+      const detail = document.createElement('span');
+      detail.textContent = `sourceRecord.selectedOptions.${index}.name: ${formatValue(option.name)} · sourceRecord.selectedOptions.${index}.value: ${formatValue(option.value)}`;
+      optionsHost.append(detail);
+    });
+    optionsHost.hidden = false;
   }
 
   async function submitCorrection(draft) {
     if (!state.test || !state.beforeRun) return;
     const evidence = Array.isArray(draft.evidence) ? draft.evidence[0] : draft.evidence;
-    if (!evidence) return setMessage($('decisionMessage'), 'No exact source citation was provided. No correction was submitted.', 'error');
+    const exactQuote = evidence?.exactQuote ?? evidence?.exact_quote;
+    if (typeof exactQuote !== 'string' || !exactQuote.trim()) return setMessage($('decisionMessage'), 'No exact source quote was provided. No correction was submitted.', 'error');
     const button = $('approveCorrectionButton');
     setBusy(button, true, 'Submitting…');
     try {
@@ -819,9 +878,9 @@
           fieldPath: draft.fieldPath,
           proposedValue: draft.proposedValue,
           evidence: {
-            sourceType: evidence.sourceType || evidence.source_type || 'catalog_field',
+            sourceType: evidence.sourceType || evidence.source_type || '',
             sourceReference: evidence.sourceReference || evidence.source_reference || '',
-            exactQuote: evidence.exactQuote || evidence.exact_quote || `${evidence.fieldPath || evidence.field_path || ''}: ${formatValue(evidence.value)}`,
+            exactQuote,
             recordId: evidence.recordId || evidence.record_id || undefined
           },
           explanation: draft.explanation || ''
@@ -1189,11 +1248,14 @@
       title.textContent = String(event.eventType || event.event_type || 'Event').replaceAll('_', ' ');
       const detail = document.createElement('span');
       const payload = parseMaybeJSON(event.payload ?? event.payloadJson ?? event.payload_json) || {};
-      const safeFields = ['sku', 'fieldPath', 'phase', 'status', 'paypalOrderId', 'paypalCaptureId', 'outcome'];
-      const pieces = safeFields.filter((key) => payload[key] !== undefined && payload[key] !== null).map((key) => `${key}: ${String(payload[key])}`);
+      const safeFields = ['catalogVersionId', 'expectedSku', 'queryTestId', 'sku', 'selectedSku', 'fieldPath', 'originalValue', 'proposedValue', 'sourceType', 'phase', 'status', 'newCatalogVersionId', 'versionId', 'paypalOrderId', 'paypalCaptureId', 'outcome'];
+      const pieces = safeFields.filter((key) => payload[key] !== undefined && payload[key] !== null).map((key) => `${key}: ${formatValue(payload[key])}`);
       detail.textContent = pieces.join(' · ') || 'Recorded application event';
       body.append(title, detail);
-      li.append(time, actor, body);
+      const meta = document.createElement('div');
+      meta.className = 'audit-meta';
+      meta.append(time, actor);
+      li.append(meta, body);
       host.append(li);
     });
   }

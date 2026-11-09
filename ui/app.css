@@ -218,8 +218,13 @@ h1, h2, h3, p { margin-top: 0; }
 .diff-proposed strong { color: var(--verified); }
 .diff-arrow { text-align: center; font-size: 21px; color: var(--signal); }
 .correction-explanation { margin: 20px 0 0; max-width: 65ch; color: #4b5551; font-size: 13px; line-height: 1.55; }
+.correction-field-path { display: grid; gap: 5px; margin-top: 15px; padding: 11px 13px; border: 1px solid var(--line); background: #fbfcfa; }
+.correction-field-path code { color: var(--ink); font: 11px/1.45 var(--mono); overflow-wrap: anywhere; }
 .evidence-quote { margin-top: 15px; padding: 14px 16px; background: #eff1ed; border-left: 2px solid var(--deep); color: var(--ink); font-size: 12px; line-height: 1.5; }
-.evidence-quote strong { display: block; margin-bottom: 5px; color: var(--muted); font: 8px var(--mono); letter-spacing: .07em; text-transform: uppercase; }
+.evidence-quote strong { display: block; margin-bottom: 5px; color: var(--muted); font: 8px var(--mono); letter-spacing: .07em; }
+.evidence-quote > span { display: block; margin-top: 6px; overflow-wrap: anywhere; }
+.correction-source-options { display: grid; gap: 6px; margin-top: 12px; padding: 13px 16px; border: 1px solid var(--line); color: var(--muted); font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; }
+.correction-source-options strong { font: 8px var(--mono); letter-spacing: .07em; }
 .decision-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 20px; }
 
 .comparison-section .section-heading-row { align-items: center; }
@@ -258,7 +263,9 @@ h1, h2, h3, p { margin-top: 0; }
 .audit-list::before { content: ''; position: absolute; top: 12px; bottom: 12px; left: 5px; width: 1px; background: var(--line-strong); }
 .audit-event { position: relative; display: grid; grid-template-columns: 16px 130px minmax(0,1fr); gap: 12px; padding: 9px 0; align-items: start; }
 .audit-event::before { content: ''; position: relative; z-index: 1; width: 9px; height: 9px; margin-top: 4px; border: 2px solid var(--ground); border-radius: 50%; background: var(--deep); box-shadow: 0 0 0 1px var(--deep); }
+.audit-meta { display: grid; align-content: start; gap: 5px; min-width: 0; }
 .audit-time { color: var(--muted); font: 9px/1.5 var(--mono); }
+.audit-body { min-width: 0; }
 .audit-body strong { display: block; font-size: 11px; }
 .audit-body span { display: block; margin-top: 3px; color: var(--muted); font-size: 10px; line-height: 1.45; overflow-wrap: anywhere; }
 .audit-actor { color: var(--signal); font: 8px var(--mono); text-transform: uppercase; letter-spacing: .06em; }

@@ -659,9 +659,19 @@ async function api(req, res, url) {
     const entityType = url.searchParams.get('entityType');
     const entityId = url.searchParams.get('entityId');
     if (!entityType || !entityId) throw apiError('INVALID_FILTER', 'entityType and entityId are required.', 400);
-    const events = db.prepare('SELECT * FROM audit_events WHERE entity_type=? AND entity_id=? ORDER BY created_at').all(entityType, entityId)
-      .map((row) => ({ id: row.id, entityType: row.entity_type, entityId: row.entity_id, actor: row.actor,
-        eventType: row.event_type, payload: parseJson(row.payload_json, {}), createdAt: row.created_at }));
+    const queryTestEvents = entityType === 'query_test';
+    const statement = queryTestEvents
+      ? `SELECT * FROM audit_events
+          WHERE (entity_type=? AND entity_id=?)
+             OR (entity_type='test_run' AND entity_id IN (SELECT id FROM test_runs WHERE query_test_id=?))
+             OR (entity_type='correction' AND entity_id IN (SELECT id FROM corrections WHERE query_test_id=?))
+          ORDER BY created_at, id`
+      : 'SELECT * FROM audit_events WHERE entity_type=? AND entity_id=? ORDER BY created_at, id';
+    const rows = queryTestEvents
+      ? db.prepare(statement).all(entityType, entityId, entityId, entityId)
+      : db.prepare(statement).all(entityType, entityId);
+    const events = rows.map((row) => ({ id: row.id, entityType: row.entity_type, entityId: row.entity_id, actor: row.actor,
+      eventType: row.event_type, payload: parseJson(row.payload_json, {}), createdAt: row.created_at }));
     return send(res, 200, { events });
   }
   throw apiError('NOT_FOUND', 'API route not found.', 404);

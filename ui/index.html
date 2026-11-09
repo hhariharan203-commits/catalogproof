@@ -188,12 +188,14 @@
             </div>
             <div class="correction-sheet">
               <div class="value-diff">
-                <div class="diff-value"><span class="micro-label">CURRENT VALUE</span><strong id="originalValue">—</strong></div>
+                <div class="diff-value"><span class="micro-label">ORIGINAL VALUE</span><strong id="originalValue">—</strong></div>
                 <span class="diff-arrow" aria-hidden="true">→</span>
                 <div class="diff-value diff-proposed"><span class="micro-label">PROPOSED VALUE</span><strong id="proposedValue">—</strong></div>
               </div>
               <p id="correctionExplanation" class="correction-explanation"></p>
+              <div class="correction-field-path"><span class="micro-label">FIELD PATH</span><code id="correctionFieldPath">Not provided</code></div>
               <div id="correctionEvidence" class="evidence-quote"></div>
+              <div id="correctionSourceOptions" class="correction-source-options" hidden></div>
               <div id="correctionActions" class="decision-actions">
                 <button id="rejectCorrectionButton" class="button button-quiet" type="button">Reject suggestion</button>
                 <button id="approveCorrectionButton" class="button button-primary" type="button">Approve correction</button>
