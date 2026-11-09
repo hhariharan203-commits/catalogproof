@@ -282,3 +282,10 @@ This section supersedes the earlier intermediate failure counts above; those ent
 - Latest suites after these changes: `npm test` — 66 passed, 0 failed, 2 opt-in live-AI skips; `npm run test:live` — 68 passed, 0 failed, 0 skipped. The live suite exercised NVIDIA on the synthetic fixture; neither suite called PayPal. The recorded Sandbox order remains the only real CatalogProof transaction in this task.
 - A narrated, captioned local video is complete at 1:49 (H.264 1280×720, AAC narration, embedded captions; SRT sidecar also available). Its source app footage is unchanged. The story stays honest: the intended SKU was selected both before and after, so it shows conflict resolution rather than a wrong-to-right SKU flip. No video has been uploaded; the public YouTube URL and Devpost submission remain pending.
 - The reviewed code and tests were published in commit `dc328f8`; final release notes were then pushed to `main`, and the remote branch was checked against the local revision. Port 3002 is temporary; the README contains local run instructions for judges who configure their own NVIDIA and PayPal Sandbox credentials. The full P0 matrix and a fresh clean-browser check are not complete. Do not describe the preview as durable or the app as production-ready.
+
+
+## Public video publication — Nov 10, 2026, 01:04 IST
+
+- The owner approved publication of the reviewed creator cut. The exact approved 1:54 video is public on the owner’s Hari Haran channel, with English timed captions. Published URL: https://www.youtube.com/watch?v=gMjwFVx-D7s. The YouTube page/Studio showed Public visibility, runtime under three minutes, and no issues in the platform’s checks.
+- The description retains the synthetic-data and Sandbox-only disclosures; the video does not show buyer credentials or personal buyer details and does not claim a wrong-to-right SKU switch, real merchant outcome, or real-money transaction.
+- The public YouTube deliverable is complete. The owner still needs to submit the Devpost entry manually. There is no durable hosted judge demo; the public README provides local setup/run instructions.
