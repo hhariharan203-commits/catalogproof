@@ -7,7 +7,7 @@ Status: targeted QA has run against the current shared source tree. Do not treat
 - Test the exact integrated build and record its Git commit/hash, build date, environment, and test date.
 - Use PayPal Sandbox only. Redact credentials, buyer emails, tokens, and private catalog data from all saved evidence.
 - Keep the merchant-supplied source snapshot and test query immutable during each before/after pair.
-- Label the Livostyle file as a licensed public dataset and its live availability conflict as time-sensitive; it is not evidence of a merchant-reported issue or proven harm. Recheck it before using it. It does not by itself pass the differentiation test because standard feed diagnostics document availability-mismatch checks.
+- Historical only: the earlier Livostyle investigation found a time-sensitive availability mismatch within conventional validator coverage. It is not the current seed and does not establish a merchant-reported issue or differentiation.
 - Record each case as PASS, FAIL, BLOCKED, or NOT RUN with reproducible input, expected result, observed result, and evidence path. A successful HTTP response alone is not sufficient for a business-state assertion.
 
 ## P0 — release-blocking acceptance and security cases
@@ -55,7 +55,7 @@ Status: targeted QA has run against the current shared source tree. Do not treat
 | P1-07 | Performance | Load full 2,938-product licensed fixture and run representative searches/reruns. | No timeout/crash; UI remains responsive; record timings. No unsupported speed claims. |
 | P1-08 | Logging/privacy | Inspect server logs and analytics with synthetic test buyer and catalog data. | No secrets or unnecessary buyer PII; errors are actionable but redacted. |
 | P1-09 | Reset/recovery | Follow documented demo reset, restart server, and recover from interrupted checkout. | Repeatable clean demo; pending payment reconciles before retry; no stale “paid” record. |
-| P1-10 | Evidence quality | Recheck Livostyle live page/Shopify JSON immediately before demo. Compare to snapshot and license. | Label sources/timestamps; if the conflict has disappeared, do not present it as current; use it only as historical/stale fixture or switch to another verified case. |
+| P1-10 | Evidence quality | Verify the Shopify mock.shop sample source, fiction disclaimer, exact variant options and the intentionally altered seed field. | Clearly identify the sample as synthetic; show the source value and the controlled test change; do not claim real inventory or merchant demand. |
 
 ## Differentiation gate (not a QA pass by synthetic tests)
 
@@ -70,7 +70,7 @@ Status: targeted QA has run against the current shared source tree. Do not treat
 
 1. The updated contract specifies single-workspace demo auth, signed HttpOnly/Secure/SameSite=Lax sessions, server-derived `approvedBy`, origin/CSRF checks, rate/body limits and a restricted reset. These are specified but unverified; P0-12, P0-22 and P0-27 remain release gates. This is not multi-tenant production auth.
 2. No runnable app existed at the time this matrix was drafted; no tests or end-to-end run have been performed by QA.
-3. The available Livostyle source conflict is an availability mismatch documented as within conventional validator coverage; it is not yet proof of CatalogProof's claimed differentiation.
+3. The earlier Livostyle conflict is historical research only. The current seed uses Shopify mock.shop fictional sample data and a deliberately altered attribute; it proves controlled demo mechanics only, not real merchant differentiation.
 4. AI/PayPal environment configuration and credentials must be verified by the integration owner without exposing values. Missing AI must fail closed as `AI_UNAVAILABLE`; missing PayPal must fail closed as `PAYPAL_UNAVAILABLE`.
 
 ## Execution record — Nov 9, 2026
@@ -108,6 +108,6 @@ This section supersedes the earlier intermediate failure counts above; those ent
 - Independent black-box checks on the latest local server: reset restores 12 clearly labeled fictional Shopify mock.shop rows and leaves the audit empty; `available:"false"` is rejected with HTTP 400 `INVALID_AVAILABILITY` without replacing the current catalog; a client correction that contradicts the frozen diagnosis is rejected with HTTP 400 `CORRECTION_NOT_MATCHED_TO_DIAGNOSIS`.
 - Local mocked route flow covers import → AI response fixture → correction submission → seller approval → same frozen query replay → PayPal order fixture → capture/readback. It proves routes/state logic only. Mocked provider responses are not live AI or PayPal evidence.
 - Independent mocked PayPal negative tests: mismatched capture amount and mismatched capture currency both return HTTP 409, `status:"mismatch"`, `verifiedPaid:false`. No test uses live PayPal credentials.
-- The default product dataset is fictional Shopify mock.shop sample content plus one deliberately omitted color attribute, marked `isSynthetic=true`. Shopify explicitly says its sample catalogs/prices/inventory are fictional and checkout is mocked. This is allowed sample data for engineering tests, not evidence of a real merchant defect or live inventory: https://shopify.dev/docs/storefronts/headless/mock-shop
+- The default product dataset is fictional Shopify mock.shop sample content plus one deliberately incorrect color attribute, marked `isSynthetic=true`. Shopify explicitly says its sample catalogs/prices/inventory are fictional and checkout is mocked. This is allowed sample data for engineering tests, not evidence of a real merchant defect or live inventory: https://shopify.dev/docs/storefronts/headless/mock-shop
 - **Still BLOCKED / NOT RUN:** live inference; PayPal Sandbox buyer approval, capture and API readback; genuine purchasable merchant catalog and differentiation baseline; clean-browser hosted-deployment smoke; published GitHub repo; screen-recorded demo/video upload. The PayPal Developer signup is waiting on the owner’s one-time verification code; no Sandbox REST credentials are available to the app.
 - **Current release judgment: NOT READY.** The local security and route tests are green, but the defining live-provider transaction and hosted demo have not been proven. Do not claim a successful live purchase or completed hackathon submission.
