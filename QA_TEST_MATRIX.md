@@ -214,3 +214,9 @@ This section supersedes the earlier intermediate failure counts above; those ent
 
 - The correct top-of-page row is “Allow payments sent to me in a currency I do not hold.” “Yes, accept and convert them to USD” is selected in the current Sandbox view, but there is no currency-specific submit control or visible auto-save confirmation.
 - The previous authenticated fresh readback showed all three options unselected, so the present selection remains unverified. No setting or order was changed in this inspection; the existing USD 24.00 order remains pending and uncaptured.
+
+
+## Seller-account match check — Nov 9, 2026, 22:06 IST
+
+- Read-only comparison confirms the generated Sandbox Business seller being viewed matches the payee on the pending order. Editing the wrong test seller is not the cause indicated by this check.
+- The pending order remains `PAYER_ACTION_REQUIRED`; no preference or order state was changed, and there is no capture. Currency-preference persistence is still unverified.
