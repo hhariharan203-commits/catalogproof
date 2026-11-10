@@ -296,3 +296,8 @@ This section supersedes the earlier intermediate failure counts above; those ent
 - Hari manually submitted the entry; the public project page is https://devpost.com/software/catalogproof. The page is publicly readable, and its description matches the synthetic-data, Sandbox-only, and no-wrong-to-right-flip caveats.
 - The page links the public GitHub repository and YouTube demo and contains three project screenshots; the screenshot assets returned successfully. The README setup anchor resolves to the judge setup section. No separate durable hosted-demo URL is listed, consistent with the disclosed local-run instructions.
 - The YouTube watch page is publicly listed with the expected title, 1:54 duration, and transcript. One automated embed extraction displayed “Video unavailable,” although YouTube page metadata was accessible and the owner’s screenshot showed the player at 0:09/1:54. For extra confidence, tap play on the public Devpost embed once; no other broken project links were found in this check.
+
+
+## Post-check owner confirmation — Nov 10, 2026, 11:01 IST
+
+- YouTube public playback was independently visible in the owner’s session; Hari confirmed the video played and the Devpost entry was fully submitted. This supersedes the earlier isolated-browser attempt that stopped at YouTube’s automated bot check; that attempt did not show the video was private or broken.

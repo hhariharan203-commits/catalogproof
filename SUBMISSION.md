@@ -57,13 +57,13 @@ The observed run selected the intended SKU both before and after the correction:
 
 - Source repository: https://github.com/hhariharan203-commits/catalogproof
 - License: MIT (`LICENSE` in the repository).
-- Public YouTube demo: https://www.youtube.com/watch?v=gMjwFVx-D7s (1:54, public, English captions, posted on Hari Haran’s channel). The exact approved footage is used; the demo is synthetic and PayPal Sandbox-only.
+- Public YouTube demo: https://www.youtube.com/watch?v=gMjwFVx-D7s (1:54, public, English captions, posted on Hari Haran’s channel). Hari confirmed that it plays. The exact approved footage is used; the demo is synthetic and PayPal Sandbox-only.
 - The original review MP4 and SRT sidecar are local files; the published video player is the public deliverable.
 - Hosted demo: no durable public judge URL is ready. Use the repository’s local setup instructions as the fallback; do not submit a temporary preview as stable hosting.
 
 ## Submission status
 
-The owner submitted the entry manually. The public project page is https://devpost.com/software/catalogproof. The public repository and 1:54 YouTube video are linked from the entry. There is no durable hosted demo; judges can use the public README’s complete local setup/run instructions and will need their own NVIDIA and PayPal Sandbox test credentials for live provider steps.
+The owner submitted the entry manually. The public project page is https://devpost.com/software/catalogproof. The public repository and 1:54 YouTube video are linked from the entry, and Hari confirmed the video plays. There is no durable hosted demo; judges can use the public README’s complete local setup/run instructions and will need their own NVIDIA and PayPal Sandbox test credentials for live provider steps.
 
 ## Claims to avoid
 
