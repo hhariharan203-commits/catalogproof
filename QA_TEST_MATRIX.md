@@ -289,3 +289,10 @@ This section supersedes the earlier intermediate failure counts above; those ent
 - The owner approved publication of the reviewed creator cut. The exact approved 1:54 video is public on the owner’s Hari Haran channel, with English timed captions. Published URL: https://www.youtube.com/watch?v=gMjwFVx-D7s. The YouTube page/Studio showed Public visibility, runtime under three minutes, and no issues in the platform’s checks.
 - The description retains the synthetic-data and Sandbox-only disclosures; the video does not show buyer credentials or personal buyer details and does not claim a wrong-to-right SKU switch, real merchant outcome, or real-money transaction.
 - The public YouTube deliverable is complete. The owner still needs to submit the Devpost entry manually. There is no durable hosted judge demo; the public README provides local setup/run instructions.
+
+
+## Public Devpost page check — Nov 10, 2026, 10:53 IST
+
+- Hari manually submitted the entry; the public project page is https://devpost.com/software/catalogproof. The page is publicly readable, and its description matches the synthetic-data, Sandbox-only, and no-wrong-to-right-flip caveats.
+- The page links the public GitHub repository and YouTube demo and contains three project screenshots; the screenshot assets returned successfully. The README setup anchor resolves to the judge setup section. No separate durable hosted-demo URL is listed, consistent with the disclosed local-run instructions.
+- The YouTube watch page is publicly listed with the expected title, 1:54 duration, and transcript. One automated embed extraction displayed “Video unavailable,” although YouTube page metadata was accessible and the owner’s screenshot showed the player at 0:09/1:54. For extra confidence, tap play on the public Devpost embed once; no other broken project links were found in this check.

@@ -61,13 +61,10 @@ The observed run selected the intended SKU both before and after the correction:
 - The original review MP4 and SRT sidecar are local files; the published video player is the public deliverable.
 - Hosted demo: no durable public judge URL is ready. Use the repository’s local setup instructions as the fallback; do not submit a temporary preview as stable hosting.
 
-## Before you submit
+## Submission status
 
-1. The final reviewed server/test hardening and submission documentation are published on the repository’s `main` branch. Check the latest public `main` revision before entering the Devpost link.
-2. The public video is uploaded and its published player confirms the 1:54 runtime and English captions. Keep its YouTube URL in the entry; do not imply a wrong-SKU flip or merchant outcome.
-3. Use the repository’s complete local setup/run instructions for judge access; there is no durable hosted demo. The preview is temporary and login-protected; do not put the private demo password in public copy.
-4. Fill the event-specific Devpost fields, use the public repository and video links above, and submit manually. No Devpost submission has been made.
+The owner submitted the entry manually. The public project page is https://devpost.com/software/catalogproof. The public repository and 1:54 YouTube video are linked from the entry. There is no durable hosted demo; judges can use the public README’s complete local setup/run instructions and will need their own NVIDIA and PayPal Sandbox test credentials for live provider steps.
 
 ## Claims to avoid
 
-Do not claim real merchant data or a persistent merchant defect, product availability, customer demand, sales/conversion lift, production readiness, multi-tenant security, superiority over baseline validators, or a wrong-SKU-to-right-SKU flip. Do not call mocked PayPal checks real transactions, and do not say the project is submitted until you submit it.
+Do not claim real merchant data or a persistent merchant defect, product availability, customer demand, sales/conversion lift, production readiness, multi-tenant security, superiority over baseline validators, or a wrong-SKU-to-right-SKU flip. Do not call mocked PayPal checks real transactions; the only completed transaction cited here was a PayPal Sandbox test, not real money.
